@@ -120,22 +120,26 @@
   // GOOGLE SHEETS SYNC
   // =========================
   async function syncToSheets(treeObj) {
-    try {
-      const params = new URLSearchParams();
-      for (const key in treeObj) {
-        const value = Array.isArray(treeObj[key]) ? treeObj[key].join(",") : treeObj[key];
-        if (key === "photos") {
-  params.append("photos", JSON.stringify(t.photos || []));
-} else {
-  params.append(key, value ?? "");
+  try {
+    const params = new URLSearchParams();
+
+    for (const key in treeObj) {
+      const value = Array.isArray(treeObj[key])
+        ? treeObj[key].join(",")
+        : treeObj[key];
+
+      params.append(key, value ?? "");
+    }
+
+    await fetch(API_URL, {
+      method: "POST",
+      body: params
+    });
+  } catch (e) {
+    console.warn("Sync Google Sheets échouée", e);
+  }
 }
 
-      }
-      await fetch(API_URL, { method: "POST", body: params });
-    } catch (e) {
-      console.warn("Sync Google Sheets échouée", e);
-    }
-  }
 
   async function deleteFromSheets(id) {
     try {
