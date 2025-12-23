@@ -124,9 +124,17 @@
     const params = new URLSearchParams();
 
     for (const key in treeObj) {
-      const value = Array.isArray(treeObj[key])
-        ? treeObj[key].join(",")
-        : treeObj[key];
+      for (const key in treeObj) {
+  let value = treeObj[key];
+
+  if (key === "photos" && Array.isArray(value)) {
+    value = value.map(p => p.dataUrl).join(",");
+  } else if (Array.isArray(value)) {
+    value = value.join(",");
+  }
+
+  params.append(key, value ?? "");
+}
 
       params.append(key, value ?? "");
     }
