@@ -121,17 +121,31 @@
 // =========================
 async function syncToSheets(treeObj) {
   try {
+    const params = new URLSearchParams();
+
+    for (const key in treeObj) {
+      let value = treeObj[key];
+
+      // 📸 photos : on envoie le JSON sous forme de string
+      if (key === "photos" && Array.isArray(value)) {
+        value = JSON.stringify(value);
+      } else if (Array.isArray(value)) {
+        value = value.join(",");
+      }
+
+      params.append(key, value ?? "");
+    }
+
     await fetch(API_URL, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(treeObj)
+      body: params
     });
+
   } catch (e) {
     console.warn("Sync Google Sheets échouée", e);
   }
 }
+
 
 
 let isAgentMode = localStorage.getItem("agentMode") === "true";
