@@ -117,7 +117,7 @@
   }
 
 // =========================
-// GOOGLE SHEETS SYNC (CORRIGÉ)
+// GOOGLE SHEETS SYNC (FINAL)
 // =========================
 async function syncToSheets(treeObj) {
   try {
@@ -133,25 +133,6 @@ async function syncToSheets(treeObj) {
   }
 }
 
-
-
-
- async function syncToSheets(treeObj) {
-  try {
-    const payload = JSON.stringify(treeObj);
-
-    await fetch(API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: payload
-    });
-
-  } catch (e) {
-    console.warn("Sync Google Sheets échouée", e);
-  }
-}
 
 let isAgentMode = localStorage.getItem("agentMode") === "true";
 
