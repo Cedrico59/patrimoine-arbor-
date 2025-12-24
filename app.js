@@ -914,7 +914,12 @@ if (undoBtn) {
         t.updatedAt = Date.now();
         t.photos = [...(t.photos || []), ...photos];
 
-        await syncToSheets(t);
+// 🔴 ENVOI EXPLICITE DES PHOTOS
+await syncToSheets({
+  ...t,
+  photos: t.photos
+});
+
 
         persistAndRefresh(t.id);
         photosEl().value = "";
