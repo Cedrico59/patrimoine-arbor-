@@ -915,10 +915,16 @@ if (undoBtn) {
         t.photos = [...(t.photos || []), ...photos];
 
 // 🔴 ENVOI EXPLICITE DES PHOTOS
-await syncToSheets({
-  ...t,
-  photos: t.photos
-});
+const payload = { ...t };
+
+// ⚠️ envoyer les photos UNIQUEMENT si présentes
+if (t.photos && t.photos.length > 0) {
+  payload.photos = t.photos;
+}
+console.log("📤 Photos envoyées :", payload.photos?.length || 0);
+
+await syncToSheets(payload);
+
 
 
         persistAndRefresh(t.id);
