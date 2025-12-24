@@ -116,37 +116,40 @@
     if (focusId) setSelected(focusId);
   }
 
-  // =========================
-  // GOOGLE SHEETS SYNC
-  // =========================
-  async function syncToSheets(treeObj) {
+// =========================
+// GOOGLE SHEETS SYNC (CORRIGÉ)
+// =========================
+async function syncToSheets(treeObj) {
   try {
     const params = new URLSearchParams();
 
     for (const key in treeObj) {
-      for (const key in treeObj) {
-  let value = treeObj[key];
+      const value = treeObj[key];
 
-  if (key === "photos" && Array.isArray(value)) {
-    value = value.map(p => p.dataUrl).join(",");
-  } else if (Array.isArray(value)) {
-    value = value.join(",");
-  }
-
-  params.append(key, value ?? "");
-}
-
-      params.append(key, value ?? "");
+      // 📸 PHOTOS → JSON OBLIGATOIRE
+      if (key === "photos" && Array.isArray(value)) {
+        params.append("photos", JSON.stringify(value));
+      }
+      // 📋 AUTRES TABLEAUX
+      else if (Array.isArray(value)) {
+        params.append(key, value.join(","));
+      }
+      // 🔤 VALEURS SIMPLES
+      else {
+        params.append(key, value ?? "");
+      }
     }
 
     await fetch(API_URL, {
       method: "POST",
       body: params
     });
+
   } catch (e) {
     console.warn("Sync Google Sheets échouée", e);
   }
 }
+
 
 
   async function deleteFromSheets(id) {
