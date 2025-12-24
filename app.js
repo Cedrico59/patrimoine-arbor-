@@ -121,33 +121,13 @@
 // =========================
 async function syncToSheets(treeObj) {
   try {
-    const params = new URLSearchParams();
-
-    for (const key in treeObj) {
-      let value = treeObj[key];
-
-      // 📸 CAS DES PHOTOS
-      if (key === "photos" && Array.isArray(value)) {
-        value = JSON.stringify(
-          value.map(p => ({
-            dataUrl: p.dataUrl,
-            name: p.name || "photo.jpg"
-          }))
-        );
-      }
-      // tableaux simples
-      else if (Array.isArray(value)) {
-        value = value.join(",");
-      }
-
-      params.append(key, value ?? "");
-    }
-
     await fetch(API_URL, {
       method: "POST",
-      body: params
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(treeObj)
     });
-
   } catch (e) {
     console.warn("Sync Google Sheets échouée", e);
   }
@@ -156,16 +136,23 @@ async function syncToSheets(treeObj) {
 
 
 
-  async function deleteFromSheets(id) {
-    try {
-      const params = new URLSearchParams();
-      params.append("action", "delete");
-      params.append("id", id);
-      await fetch(API_URL, { method: "POST", body: params });
-    } catch (e) {
-      console.warn("Suppression Google Sheets échouée", e);
-    }
+ async function syncToSheets(treeObj) {
+  try {
+    const payload = JSON.stringify(treeObj);
+
+    await fetch(API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: payload
+    });
+
+  } catch (e) {
+    console.warn("Sync Google Sheets échouée", e);
   }
+}
+
 let isAgentMode = localStorage.getItem("agentMode") === "true";
 
 function applyAgentMode() {
