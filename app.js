@@ -116,57 +116,37 @@
     if (focusId) setSelected(focusId);
   }
 
-// =========================
-// GOOGLE SHEETS SYNC (FINAL)
-// =========================
-async function syncToSheets(treeObj) {
-  try {
-    const params = new URLSearchParams();
+  // =========================
+  // GOOGLE SHEETS SYNC
+  // =========================
+  async function syncToSheets(treeObj) {
+    try {
+      const params = new URLSearchParams();
+      for (const key in treeObj) {
+        const value = Array.isArray(treeObj[key]) ? treeObj[key].join(",") : treeObj[key];
+        if (key === "photos") {
+  params.append("photos", JSON.stringify(t.photos || []));
+} else {
+  params.append(key, value ?? "");
+}
 
-    for (const key in treeObj) {
-      let value = treeObj[key];
-
-      // 📸 photos : on envoie le JSON sous forme de string
-      if (key === "photos" && Array.isArray(value)) {
-        value = JSON.stringify(value);
-      } else if (Array.isArray(value)) {
-        value = value.join(",");
       }
-
-      params.append(key, value ?? "");
+      await fetch(API_URL, { method: "POST", body: params });
+    } catch (e) {
+      console.warn("Sync Google Sheets échouée", e);
     }
-
-    await fetch(API_URL, {
-      method: "POST",
-      body: params
-    });
-
-  } catch (e) {
-    console.warn("Sync Google Sheets échouée", e);
   }
-}
 
-
-
-let isAgentMode = localStorage.getItem("agentMode") === "true";
-
-function applyAgentMode() {
-  document.body.classList.toggle("agent-mode", isAgentMode);
-  localStorage.setItem("agentMode", isAgentMode);
-
-  const btn = document.getElementById("agentModeBtn");
-  if (btn) {
-    btn.textContent = isAgentMode ? "🖥️ Mode bureau" : "📱 Mode agent";
+  async function deleteFromSheets(id) {
+    try {
+      const params = new URLSearchParams();
+      params.append("action", "delete");
+      params.append("id", id);
+      await fetch(API_URL, { method: "POST", body: params });
+    } catch (e) {
+      console.warn("Suppression Google Sheets échouée", e);
+    }
   }
-}
-
-document.getElementById("agentModeBtn")?.addEventListener("click", () => {
-  isAgentMode = !isAgentMode;
-  applyAgentMode();
-});
-
-// appliquer au chargement
-applyAgentMode();
 
   // =========================
   // ICONS / COLORS
@@ -896,18 +876,7 @@ if (undoBtn) {
         t.updatedAt = Date.now();
         t.photos = [...(t.photos || []), ...photos];
 
-// 🔴 ENVOI EXPLICITE DES PHOTOS
-const payload = { ...t };
-
-// ⚠️ envoyer les photos UNIQUEMENT si présentes
-if (t.photos && t.photos.length > 0) {
-  payload.photos = t.photos;
-}
-console.log("📤 Photos envoyées :", payload.photos?.length || 0);
-
-await syncToSheets(payload);
-
-
+        await syncToSheets(t);
 
         persistAndRefresh(t.id);
         photosEl().value = "";
