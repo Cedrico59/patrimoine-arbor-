@@ -124,20 +124,23 @@ async function syncToSheets(treeObj) {
     const params = new URLSearchParams();
 
     for (const key in treeObj) {
-      const value = treeObj[key];
+      let value = treeObj[key];
 
-      // 📸 PHOTOS → JSON OBLIGATOIRE
+      // 📸 CAS DES PHOTOS
       if (key === "photos" && Array.isArray(value)) {
-        params.append("photos", JSON.stringify(value));
+        value = JSON.stringify(
+          value.map(p => ({
+            dataUrl: p.dataUrl,
+            name: p.name || "photo.jpg"
+          }))
+        );
       }
-      // 📋 AUTRES TABLEAUX
+      // tableaux simples
       else if (Array.isArray(value)) {
-        params.append(key, value.join(","));
+        value = value.join(",");
       }
-      // 🔤 VALEURS SIMPLES
-      else {
-        params.append(key, value ?? "");
-      }
+
+      params.append(key, value ?? "");
     }
 
     await fetch(API_URL, {
@@ -149,6 +152,7 @@ async function syncToSheets(treeObj) {
     console.warn("Sync Google Sheets échouée", e);
   }
 }
+
 
 
 
