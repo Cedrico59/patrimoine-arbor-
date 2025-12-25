@@ -375,7 +375,8 @@ small{color:#9db0ff}
         if (!selectedId) return;
         const t = getTreeById(selectedId);
         if (!t) return;
-        t.photos = (t.photos || []).filter((_, i) => i !== idx);
+        t.photos = (t.photos || []).filter(p => p.id !== photos[idx].id);
+
         t.updatedAt = Date.now();
         persistAndRefresh(t.id);
 renderPhotoCarousel(t.photos || []);
@@ -438,7 +439,7 @@ async function stampPhotoWithMeta(file, lat, lng) {
   });
 }
 
-  async function readFilesAsDataUrls(files) {
+async function readFilesAsDataUrls(files) {
   const out = [];
 
   const lat = parseFloat(latEl().value);
@@ -448,6 +449,7 @@ async function stampPhotoWithMeta(file, lat, lng) {
     const stampedDataUrl = await stampPhotoWithMeta(f, lat, lng);
 
     out.push({
+      id: crypto.randomUUID(), // ✅ CRITIQUE
       name: f.name,
       type: f.type,
       size: f.size,
@@ -458,6 +460,7 @@ async function stampPhotoWithMeta(file, lat, lng) {
 
   return out;
 }
+
 
 
   // =========================
