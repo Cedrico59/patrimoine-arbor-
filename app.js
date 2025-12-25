@@ -219,12 +219,21 @@ function addLegendToMap() {
 
   legend.onAdd = function () {
     const div = L.DomUtil.create("div", "map-legend");
-    div.innerHTML = "<b>Légende — Secteurs</b><br>";
+
+    div.innerHTML = `
+      <div class="legend-header">
+        <b>Légende — Secteurs</b>
+        <button id="legendToggleBtn" title="Afficher / masquer">➖</button>
+      </div>
+      <div id="legendContent"></div>
+    `;
+
+    const content = div.querySelector("#legendContent");
 
     SECTEURS.forEach((secteur) => {
       const color = getColorFromSecteur(secteur);
 
-      div.innerHTML += `
+      content.innerHTML += `
         <div class="legend-item">
           <span class="legend-icon" style="background:${color}"></span>
           ${secteur}
@@ -236,7 +245,24 @@ function addLegendToMap() {
   };
 
   legend.addTo(map);
+
+  // toggle après insertion DOM
+  setTimeout(() => {
+    const btn = document.getElementById("legendToggleBtn");
+    const content = document.getElementById("legendContent");
+
+    if (!btn || !content) return;
+
+    let open = true;
+
+    btn.onclick = () => {
+      open = !open;
+      content.style.display = open ? "block" : "none";
+      btn.textContent = open ? "➖" : "➕";
+    };
+  }, 0);
 }
+
 
   // =========================
   // PREVIEW + NEW TAB
@@ -689,6 +715,58 @@ small{color:#9db0ff}
       console.warn("Erreur chargement contour commune", err);
     }
   }
+// =========================
+// 📍 GEOLOCALISATION GPS
+// =========================
+function locateUserGPS() {
+
+  if (!navigator.geolocation) {
+    alert("La géolocalisation n’est pas supportée sur cet appareil.");
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+
+      // 🗺️ centre la carte
+      map.setView([lat, lng], 17);
+
+      // ✏️ prépare une nouvelle fiche
+      selectedId = null;
+      deleteBtn().disabled = true;
+
+      editorTitle().textContent = "Ajouter un arbre (GPS)";
+      editorHint().textContent = "Position GPS détectée automatiquement.";
+
+      clearForm(false);
+      latEl().value = fmtCoord(lat);
+      lngEl().value = fmtCoord(lng);
+
+      renderTreePreview(null);
+      highlightListSelection();
+
+      // 📍 marqueur temporaire
+      L.circleMarker([lat, lng], {
+        radius: 8,
+        color: "#00e5ff",
+        fillColor: "#00e5ff",
+        fillOpacity: 0.9
+      }).addTo(map);
+
+    },
+    (err) => {
+      alert("Impossible d’obtenir la position GPS.");
+      console.error(err);
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0
+    }
+  );
+}
 
   // =========================
   // INIT
@@ -758,6 +836,10 @@ map.on("tap", handleMapSelect);
     };
 const toggleListBtn = el("toggleListBtn");
 const treeListWrapper = el("treeListWrapper");
+const gpsBtn = el("gpsBtn");
+if (gpsBtn) {
+  gpsBtn.onclick = () => locateUserGPS();
+}
 
 if (toggleListBtn && treeListWrapper) {
   let collapsed = false;
@@ -808,7 +890,7 @@ if (toggleListBtn && treeListWrapper) {
       renderTreePreview(null);
     };
 
-    deleteBtn().onclick = async () => {
+ deleteBtn().onclick = async () => {
   if (!selectedId) return;
   if (!confirm("Supprimer cet arbre ?")) return;
 
@@ -819,24 +901,30 @@ if (toggleListBtn && treeListWrapper) {
   lastDeletedTree = { ...t };
 
   // 🔗 suppression Google Sheets
-  await deleteFromSheets(t.id);
+  try {
+    const params = new URLSearchParams();
+    params.append("action", "delete");
+    params.append("id", t.id);
+    await fetch(API_URL, { method: "POST", body: params });
+  } catch (e) {
+    console.warn("Suppression Google Sheets échouée", e);
+  }
 
   // 🗑️ suppression locale
   trees = trees.filter(x => x.id !== t.id);
   removeMarker(t.id);
   selectedId = null;
-
   saveTreesLocal();
   renderMarkers();
   renderList();
   renderSecteurCount();
   setSelected(null);
-  renderTreePreview(null);
 
-  // 👀 afficher le bouton Annuler
+  // 👀 afficher bouton Annuler
   const undoBtn = el("undoBtn");
   if (undoBtn) undoBtn.style.display = "inline-block";
 };
+
 const undoBtn = el("undoBtn");
 if (undoBtn) {
   undoBtn.onclick = async () => {
