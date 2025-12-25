@@ -705,31 +705,41 @@ small{color:#9db0ff}
       attribution: "&copy; OpenStreetMap",
     }).addTo(map);
 
-    // Click map => coords nouvelle fiche
-    map.on("click", (e) => {
-      // si contour chargé + pip dispo => imposer dans la commune
-      if (cityLayer && typeof leafletPip !== "undefined") {
-        const inside = leafletPip.pointInLayer([e.latlng.lng, e.latlng.lat], cityLayer).length > 0;
-        if (!inside) {
-          alert("⛔ L’arbre doit être situé dans Marcq-en-Barœul");
-          return;
-        }
-      }
+   // 📍 Sélection emplacement (PC + mobile)
+function handleMapSelect(e) {
 
-      const { lat, lng } = e.latlng;
-      selectedId = null;
+  // si contour chargé + pip dispo => imposer dans la commune
+  if (cityLayer && typeof leafletPip !== "undefined") {
+    const inside = leafletPip.pointInLayer(
+      [e.latlng.lng, e.latlng.lat],
+      cityLayer
+    ).length > 0;
 
-      deleteBtn().disabled = true;
-      editorTitle().textContent = "Ajouter un arbre";
-      editorHint().textContent = "Complète la fiche puis clique sur Enregistrer.";
+    if (!inside) {
+      alert("⛔ L’arbre doit être situé dans Marcq-en-Barœul");
+      return;
+    }
+  }
 
-      clearForm(false);
-      latEl().value = fmtCoord(lat);
-      lngEl().value = fmtCoord(lng);
+  const { lat, lng } = e.latlng;
+  selectedId = null;
 
-      renderTreePreview(null);
-      highlightListSelection();
-    });
+  deleteBtn().disabled = true;
+  editorTitle().textContent = "Ajouter un arbre";
+  editorHint().textContent = "Complète la fiche puis clique sur Enregistrer.";
+
+  clearForm(false);
+  latEl().value = fmtCoord(lat);
+  lngEl().value = fmtCoord(lng);
+
+  renderTreePreview(null);
+  highlightListSelection();
+}
+
+// 👇 IMPORTANT : PC + MOBILE
+map.on("click", handleMapSelect);
+map.on("tap", handleMapSelect);
+
   }
 
   function wireUI() {
