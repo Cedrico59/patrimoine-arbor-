@@ -108,6 +108,47 @@
 #treeListWrapper {
   margin-top: 10px;
 }
+.carousel {
+  position: relative;
+  width: 100%;
+  max-height: 320px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.carousel img {
+  max-width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+  border-radius: 12px;
+}
+
+.carousel-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0,0,0,0.5);
+  border: none;
+  color: white;
+  font-size: 22px;
+  padding: 6px 10px;
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+.carousel-btn.left { left: 8px; }
+.carousel-btn.right { right: 8px; }
+
+#carouselCount {
+  font-size: 12px;
+  opacity: 0.7;
+  margin-top: 4px;
+}
+
+.hidden {
+  display: none;
+}
+
 /* =========================
    MODE AGENT TERRAIN
 ========================= */
@@ -178,12 +219,18 @@ body.agent-mode button {
     <div class="card" id="treePreview" style="display:none;">
       <h2>Fiche de l’arbre</h2>
 
-      <img
-        id="previewPhoto"
-        class="preview-photo"
-        style="cursor:pointer"
-        onclick="openTreeInNewTab()"
-      />
+      
+
+  <!-- 🖼️ CARROUSEL PHOTOS -->
+  <div id="photoCarousel" class="carousel hidden">
+    <button class="carousel-btn left">⬅️</button>
+    <img id="carouselImage" />
+    <button class="carousel-btn right">➡️</button>
+    <div id="carouselCount"></div>
+  </div>
+
+</div>
+
 
       <div class="preview-info">
         <p><b>ID :</b> <span id="p-id"></span></p>
