@@ -1203,34 +1203,33 @@ applyAgentMode();
   });
 
   let carouselIndex = 0;
+let carouselPhotos = [];
 
 function renderPhotoCarousel(photos) {
   const box = document.getElementById("photoCarousel");
   const img = document.getElementById("carouselImage");
   const count = document.getElementById("carouselCount");
 
-carouselIndex = 0;
-
-
   if (!photos || photos.length === 0) {
     box.classList.add("hidden");
     return;
   }
 
+  carouselPhotos = photos;
+  carouselIndex = 0;
+
   box.classList.remove("hidden");
-  carouselIndex = Math.min(carouselIndex, photos.length - 1);
+  updateCarousel();
 
-  img.src = photos[carouselIndex].dataUrl;
-  count.textContent = `${carouselIndex + 1} / ${photos.length}`;
-
+  // boutons (UNE SEULE FOIS)
   box.querySelector(".left").onclick = () => {
-    carouselIndex = (carouselIndex - 1 + photos.length) % photos.length;
-    renderPhotoCarousel(photos);
+    carouselIndex = (carouselIndex - 1 + carouselPhotos.length) % carouselPhotos.length;
+    updateCarousel();
   };
 
   box.querySelector(".right").onclick = () => {
-    carouselIndex = (carouselIndex + 1) % photos.length;
-    renderPhotoCarousel(photos);
+    carouselIndex = (carouselIndex + 1) % carouselPhotos.length;
+    updateCarousel();
   };
 
   // 📱 swipe tactile
@@ -1242,5 +1241,14 @@ carouselIndex = 0;
     if (dx < -50) box.querySelector(".right").click();
   };
 }
+
+function updateCarousel() {
+  const img = document.getElementById("carouselImage");
+  const count = document.getElementById("carouselCount");
+
+  img.src = carouselPhotos[carouselIndex].dataUrl;
+  count.textContent = `${carouselIndex + 1} / ${carouselPhotos.length}`;
+}
+
 
 })();
