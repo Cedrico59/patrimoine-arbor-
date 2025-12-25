@@ -140,6 +140,21 @@ async function syncToSheets(treeObj) {
   }
 }
 
+async function deleteFromSheets(id) {
+  try {
+    const params = new URLSearchParams();
+    params.append("action", "delete");
+    params.append("id", id);
+
+    await fetch(API_URL, {
+      method: "POST",
+      body: params
+    });
+
+  } catch (e) {
+    console.warn("Suppression Google Sheets échouée", e);
+  }
+}
 
 
   // =========================
