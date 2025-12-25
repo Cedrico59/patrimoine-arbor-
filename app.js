@@ -29,6 +29,7 @@
   let trees = [];
   let selectedId = null;
   let lastDeletedTree = null;
+  let pendingPhotos = [];
 
 
   const markers = new Map(); // id -> marker
@@ -893,24 +894,49 @@ const pickGalleryBtn = document.getElementById("pickGalleryBtn");
 const cameraInput = document.getElementById("cameraInput");
 const galleryInput = document.getElementById("galleryInput");
 const photoStatus = document.getElementById("photoStatus");
-cameraInput.addEventListener("change", updatePhotoStatus);
-galleryInput.addEventListener("change", updatePhotoStatus);
+// 📸 stockage temporaire des photos (IMPORTANT mobile)
+
+
+// 📸 Caméra (mobile compatible)
+cameraInput.addEventListener("change", async () => {
+  if (!cameraInput.files || !cameraInput.files[0]) return;
+
+  const photos = await readFilesAsDataUrls(cameraInput.files);
+  pendingPhotos.push(...photos);
+
+  cameraInput.value = "";
+
+  updatePhotoStatus();
+  renderGallery(pendingPhotos);
+  renderPhotoCarousel(pendingPhotos); // ✅ AJOUT
+});
+
+
+// 🖼️ Galerie
+galleryInput.addEventListener("change", async () => {
+  if (!galleryInput.files || galleryInput.files.length === 0) return;
+
+  const photos = await readFilesAsDataUrls(galleryInput.files);
+  pendingPhotos.push(...photos);
+
+  galleryInput.value = ""; // reset
+
+  updatePhotoStatus();
+  renderGallery(pendingPhotos);
+  renderPhotoCarousel(pendingPhotos);
+
+});
+
 
 function updatePhotoStatus() {
-  const camCount = cameraInput.files ? cameraInput.files.length : 0;
-  const galCount = galleryInput.files ? galleryInput.files.length : 0;
-
-  if (camCount === 0 && galCount === 0) {
+  if (pendingPhotos.length === 0) {
     photoStatus.textContent = "";
     return;
   }
 
-  const parts = [];
-  if (camCount > 0) parts.push(`📸 ${camCount} photo${camCount > 1 ? "s" : ""}`);
-  if (galCount > 0) parts.push(`🖼️ ${galCount} photo${galCount > 1 ? "s" : ""}`);
-
-  photoStatus.textContent = parts.join(" • ");
+  photoStatus.textContent = `📷 ${pendingPhotos.length} photo${pendingPhotos.length > 1 ? "s" : ""} ajoutée${pendingPhotos.length > 1 ? "s" : ""}`;
 }
+
 
 // 📸 Caméra
 takePhotoBtn.onclick = () => {
@@ -1060,17 +1086,11 @@ if (undoBtn) {
       }
 
       const quartier = getQuartierFromLatLng(lat, lng);
-     const photosFromCamera =
-  cameraInput.files && cameraInput.files.length
-    ? await readFilesAsDataUrls(cameraInput.files)
-    : [];
+const photos = pendingPhotos;
 
-const photosFromGallery =
-  galleryInput.files && galleryInput.files.length
-    ? await readFilesAsDataUrls(galleryInput.files)
-    : [];
-
-const photos = [...photosFromCamera, ...photosFromGallery];
+pendingPhotos = [];
+renderGallery([]);
+photoStatus.textContent = "";
 
       if (selectedId) {
         // update
@@ -1216,7 +1236,8 @@ function renderPhotoCarousel(photos) {
   }
 
   carouselPhotos = photos;
-  carouselIndex = 0;
+  carouselIndex = Math.min(carouselIndex, photos.length - 1);
+
 
   box.classList.remove("hidden");
   updateCarousel();
