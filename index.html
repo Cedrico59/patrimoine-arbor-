@@ -290,7 +290,14 @@ body.agent-mode button {
       <textarea id="comment" placeholder="Note d’observation, état sanitaire, histoire, etc."></textarea>
 
       <label>Photos (jpg/png)</label>
-      <input id="photos" type="file" accept="image/*" multiple />
+      <input
+  type="file"
+  id="photos"
+  accept="image/*"
+  capture="environment"
+  multiple
+>
+
 
       <div class="btns">
         <button id="saveBtn">Enregistrer</button>
