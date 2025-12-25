@@ -1027,10 +1027,17 @@ if (undoBtn) {
       }
 
       const quartier = getQuartierFromLatLng(lat, lng);
-      const photos =
-        photosEl().files && photosEl().files.length
-          ? await readFilesAsDataUrls(photosEl().files)
-          : [];
+     const photosFromCamera =
+  cameraInput.files && cameraInput.files.length
+    ? await readFilesAsDataUrls(cameraInput.files)
+    : [];
+
+const photosFromGallery =
+  galleryInput.files && galleryInput.files.length
+    ? await readFilesAsDataUrls(galleryInput.files)
+    : [];
+
+const photos = [...photosFromCamera, ...photosFromGallery];
 
       if (selectedId) {
         // update
