@@ -1,0 +1,214 @@
+function myFunction() {
+  
+}
+
+
+function doGet() {
+  const sheet = SpreadsheetApp
+    .getActiveSpreadsheet()
+    .getSheetByName("arbres");
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    return ContentService
+      .createTextOutput(JSON.stringify([]))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  const values = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues();
+
+  const trees = values.map(row => ({
+    createdAt: row[0]?.getTime?.() || null,
+    id: row[1],
+    lat: Number(row[2]),
+    lng: Number(row[3]),
+    species: row[4],
+    height: row[5] !== "" ? Number(row[5]) : null,
+    dbh: row[6] !== "" ? Number(row[6]) : null,
+    secteur: row[7],
+    address: row[8],
+    tags: row[9] ? row[9].split(",") : [],
+    comment: row[10],
+    photos: [],        // ⚠️ les photos restent locales
+    updatedAt: Date.now()
+  }));
+
+  return ContentService
+    .createTextOutput(JSON.stringify(trees))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+
+const DRIVE_FOLDER_ID = "1Cl-GHbqX2gIgIjHbNrp20WgtosQs0EYd"; //-----COLLE_ID_DOSSIER_ICI------
+
+function uploadPhoto(base64, filename) {
+  Logger.log("📸 uploadPhoto APPELÉE");
+  Logger.log("📄 filename = " + filename);
+  Logger.log("📦 base64 length = " + (base64 ? base64.length : 0));
+
+  if (!base64 || !base64.startsWith("data:")) {
+    Logger.log("❌ base64 invalide");
+    return "";
+  }
+
+
+  const folder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
+
+  const contentType = base64.match(/^data:(.*);base64,/)[1];
+  const bytes = Utilities.base64Decode(base64.split(",")[1]);
+
+  const blob = Utilities.newBlob(bytes, contentType, filename);
+  const file = folder.createFile(blob);
+
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+  Logger.log("✅ Fichier créé ID = " + file.getId());
+
+  return "https://drive.google.com/uc?export=view&id=" + file.getId();
+}
+
+
+function deleteDriveFileFromUrl(url) {
+  try {
+    if (!url) return;
+
+    const match = url.match(/id=([^&]+)/);
+    if (!match || !match[1]) return;
+
+    const fileId = match[1];
+    DriveApp.getFileById(fileId).setTrashed(true);
+
+  } catch (e) {
+    Logger.log("Erreur suppression Drive : " + e);
+  }
+}
+
+
+function doPost(e) {
+  Logger.log("📩 doPost appelé");
+
+  const data = e.parameter;
+
+  Logger.log("📦 paramètres reçus :");
+  Logger.log(JSON.stringify(data, null, 2));
+
+
+  const sheet = SpreadsheetApp
+    .getActiveSpreadsheet()
+    .getSheetByName("arbres");
+
+
+
+  // 🔴 CAS SUPPRESSION
+if (data.action === "delete" && data.id) {
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    return ContentService.createTextOutput("NOT FOUND");
+  }
+
+  const values = sheet
+    .getRange(2, 1, lastRow - 1, sheet.getLastColumn())
+    .getValues();
+
+  for (let i = 0; i < values.length; i++) {
+
+    const row = values[i];
+    const rowId = row[1];        // colonne B
+    const photosCell = row[11];  // colonne L (photos)
+
+    if (rowId === data.id) {
+
+      // 🗑️ SUPPRESSION DES PHOTOS DRIVE
+      if (photosCell) {
+        const urls = photosCell.split(",");
+        urls.forEach(url => deleteDriveFileFromUrl(url));
+      }
+
+      // 🗑️ SUPPRESSION LIGNE SHEET
+      sheet.deleteRow(i + 2);
+
+      return ContentService.createTextOutput("DELETED");
+    }
+  }
+
+  return ContentService.createTextOutput("NOT FOUND");
+}
+
+
+
+let photoUrls = [];
+
+if (data.photos) {
+  try {
+    const photos = JSON.parse(data.photos);
+
+    Logger.log("📸 Photos reçues : " + photos.length);
+
+    photoUrls = photos
+      .filter(p => p && p.dataUrl && p.dataUrl.startsWith("data:"))
+      .map((p, i) =>
+        uploadPhoto(
+          p.dataUrl,
+          `${data.id}_${i}_${p.name || "photo.jpg"}`
+        )
+      );
+  } catch (e) {
+    Logger.log("❌ Erreur parsing photos : " + e);
+  }
+}
+
+
+
+
+  // 🟢 DONNÉES ARBRE
+  const rowData = [
+    new Date(),            // A - date
+    data.id || "",         // B - id (clé)
+    data.lat || "",
+    data.lng || "",
+    data.species || "",
+    data.height || "",
+    data.dbh || "",
+    data.secteur || "",
+    data.address || "",
+    data.tags ? data.tags.toString() : "",
+    data.comment || "",
+    photoUrls.join(",")
+
+  ];
+
+  // 🔍 RECHERCHE ID EXISTANT (colonne B)
+  const lastRow = sheet.getLastRow();
+  const ids = lastRow > 1
+    ? sheet.getRange(2, 2, lastRow - 1, 1).getValues()
+    : [];
+
+  for (let i = 0; i < ids.length; i++) {
+    if (ids[i][0] === data.id) {
+      // ✏️ MISE À JOUR
+      sheet.getRange(i + 2, 1, 1, rowData.length).setValues([rowData]);
+      return ContentService.createTextOutput("UPDATED");
+    }
+  }
+
+ // ➕ AJOUT
+sheet.appendRow(rowData);
+
+// 🔀 TRI PAR SECTEUR → RUE → ESPÈCE
+const lastRowAfterInsert = sheet.getLastRow();
+if (lastRowAfterInsert > 2) {
+  sheet
+    .getRange(2, 1, lastRowAfterInsert - 1, sheet.getLastColumn())
+    .sort([
+      { column: 8, ascending: true }, // Secteur
+      { column: 9, ascending: true }, // Rue / Adresse
+      { column: 5, ascending: true }  // Espèce
+    ]);
+}
+
+
+
+return ContentService.createTextOutput("CREATED");
+
+}
