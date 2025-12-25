@@ -290,12 +290,33 @@ body.agent-mode button {
       <textarea id="comment" placeholder="Note d’observation, état sanitaire, histoire, etc."></textarea>
 
       <label>Photos (jpg/png)</label>
+  <div class="photo-actions">
+  <button type="button" id="takePhotoBtn" class="secondary">
+    📸 Prendre une photo
+  </button>
+
+  <button type="button" id="pickGalleryBtn" class="secondary">
+    🖼️ Choisir depuis la galerie
+  </button>
+
+  <!-- Inputs cachés -->
   <input
-  type="file"
-  id="photos"
-  accept="image/*"
-  multiple
->
+    type="file"
+    id="cameraInput"
+    accept="image/*"
+    capture="environment"
+    hidden
+  >
+
+  <input
+    type="file"
+    id="galleryInput"
+    accept="image/*"
+    multiple
+    hidden
+  >
+</div>
+
 
 >
 
