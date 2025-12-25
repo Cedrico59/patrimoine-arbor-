@@ -1205,5 +1205,42 @@ applyAgentMode();
     console.log("✅ App chargée (A+B+C+D).");
   });
 
-  
+  let carouselIndex = 0;
+
+function renderPhotoCarousel(photos) {
+  const box = document.getElementById("photoCarousel");
+  const img = document.getElementById("carouselImage");
+  const count = document.getElementById("carouselCount");
+
+  if (!photos || photos.length === 0) {
+    box.classList.add("hidden");
+    return;
+  }
+
+  box.classList.remove("hidden");
+  carouselIndex = Math.min(carouselIndex, photos.length - 1);
+
+  img.src = photos[carouselIndex].dataUrl;
+  count.textContent = `${carouselIndex + 1} / ${photos.length}`;
+
+  box.querySelector(".left").onclick = () => {
+    carouselIndex = (carouselIndex - 1 + photos.length) % photos.length;
+    renderPhotoCarousel(photos);
+  };
+
+  box.querySelector(".right").onclick = () => {
+    carouselIndex = (carouselIndex + 1) % photos.length;
+    renderPhotoCarousel(photos);
+  };
+
+  // 📱 swipe tactile
+  let startX = 0;
+  img.ontouchstart = (e) => startX = e.touches[0].clientX;
+  img.ontouchend = (e) => {
+    const dx = e.changedTouches[0].clientX - startX;
+    if (dx > 50) box.querySelector(".left").click();
+    if (dx < -50) box.querySelector(".right").click();
+  };
+}
+
 })();
