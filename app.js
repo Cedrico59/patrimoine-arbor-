@@ -933,6 +933,25 @@ async function loadTreesFromSheets() {
 
   }
 }
+let isAgentMode = localStorage.getItem("agentMode") === "true";
+
+function applyAgentMode() {
+  document.body.classList.toggle("agent-mode", isAgentMode);
+  localStorage.setItem("agentMode", isAgentMode);
+
+  const btn = document.getElementById("agentModeBtn");
+  if (btn) {
+    btn.textContent = isAgentMode ? "🖥️ Mode bureau" : "📱 Mode agent";
+  }
+}
+
+document.getElementById("agentModeBtn")?.addEventListener("click", () => {
+  isAgentMode = !isAgentMode;
+  applyAgentMode();
+});
+
+// appliquer au chargement
+applyAgentMode();
 
   // =========================
   // START
