@@ -119,36 +119,27 @@
   // =========================
   // GOOGLE SHEETS SYNC
   // =========================
- async function syncToSheets(treeObj) {
+async function syncToSheets(treeObj) {
   try {
     const params = new URLSearchParams();
 
     for (const key in treeObj) {
-      // 📸 CAS DES PHOTOS
-      if (key === "photos") {
-        params.append("photos", JSON.stringify(treeObj.photos || []));
-      }
-      // tableaux simples (tags, etc.)
-      else if (Array.isArray(treeObj[key])) {
-        params.append(key, treeObj[key].join(","));
-      }
-      // valeurs simples
-      else {
-        params.append(key, treeObj[key] ?? "");
-      }
-    }
+      const value = Array.isArray(treeObj[key])
+        ? treeObj[key].join(",")
+        : treeObj[key];
 
-    console.log("📤 Envoi vers Sheets :", Object.fromEntries(params));
+      params.append(key, value ?? "");
+    }
 
     await fetch(API_URL, {
       method: "POST",
       body: params
     });
-
   } catch (e) {
-    console.warn("❌ Sync Google Sheets échouée", e);
+    console.warn("Sync Google Sheets échouée", e);
   }
 }
+
 
 
   // =========================
@@ -985,4 +976,6 @@ applyAgentMode();
 
     console.log("✅ App chargée (A+B+C+D).");
   });
+
+  
 })();
