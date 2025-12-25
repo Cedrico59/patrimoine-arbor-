@@ -666,8 +666,14 @@ document.getElementById("photoCarousel")?.classList.add("hidden");
     tagsEl().value = (t.tags || []).join(", ");
     commentEl().value = t.comment || "";
 
-    renderGallery(t.photos || []);
-renderPhotoCarousel(t.photos || []);
+  // ⚠️ Affichage des photos UNIQUEMENT si arbre déjà enregistré
+if (t.photos && t.photos.length > 0) {
+  renderGallery(t.photos);
+  renderPhotoCarousel(t.photos);
+} else {
+  document.getElementById("photoCarousel")?.classList.add("hidden");
+}
+
 renderTreePreview(t);
 
   }
