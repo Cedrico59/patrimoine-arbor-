@@ -297,15 +297,7 @@ function addLegendToMap() {
     el("p-address").textContent = t.address || "—";
     el("p-comment").textContent = t.comment || "";
 
-    const img = el("previewPhoto");
-    if (img) {
-      if (t.photos && t.photos.length > 0) {
-        img.src = t.photos[0].dataUrl;
-        img.style.display = "block";
-      } else {
-        img.style.display = "none";
-      }
-    }
+   
   }
 
   // IMPORTANT: pour que onclick="openTreeInNewTab()" marche depuis HTML
@@ -385,6 +377,8 @@ small{color:#9db0ff}
         t.photos = (t.photos || []).filter((_, i) => i !== idx);
         t.updatedAt = Date.now();
         persistAndRefresh(t.id);
+renderPhotoCarousel(t.photos || []);
+
       };
 
       meta.appendChild(span);
@@ -619,6 +613,7 @@ async function stampPhotoWithMeta(file, lat, lng) {
   addressEl().value = "";
   tagsEl().value = "";
   commentEl().value = "";
+document.getElementById("photoCarousel")?.classList.add("hidden");
 
   const cam = document.getElementById("cameraInput");
   const gal = document.getElementById("galleryInput");
@@ -668,7 +663,9 @@ async function stampPhotoWithMeta(file, lat, lng) {
     commentEl().value = t.comment || "";
 
     renderGallery(t.photos || []);
-    renderTreePreview(t);
+renderPhotoCarousel(t.photos || []);
+renderTreePreview(t);
+
   }
 
   // =========================
@@ -1211,6 +1208,9 @@ function renderPhotoCarousel(photos) {
   const box = document.getElementById("photoCarousel");
   const img = document.getElementById("carouselImage");
   const count = document.getElementById("carouselCount");
+
+carouselIndex = 0;
+
 
   if (!photos || photos.length === 0) {
     box.classList.add("hidden");
