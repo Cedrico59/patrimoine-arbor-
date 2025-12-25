@@ -420,14 +420,11 @@ async function stampPhotoWithMeta(file, lat, lng) {
       ctx.fillStyle = "#fff";
       ctx.font = `${Math.max(22, canvas.width / 40)}px Arial`;
 
-   const dateStr = new Date().toLocaleString("fr-FR");
-const coordStr = `Lat: ${lat.toFixed(6)} | Lng: ${lng.toFixed(6)}`;
-const idStr = `ID arbre : ${treeIdEl().value || "NON ATTRIBUÉ"}`;
+      const dateStr = new Date().toLocaleString("fr-FR");
+      const coordStr = `Lat: ${lat.toFixed(6)} | Lng: ${lng.toFixed(6)}`;
 
-ctx.fillText(idStr, padding, canvas.height - 60);
-ctx.fillText(dateStr, padding, canvas.height - 35);
-ctx.fillText(coordStr, padding, canvas.height - 10);
-
+      ctx.fillText(dateStr, padding, canvas.height - 40);
+      ctx.fillText(coordStr, padding, canvas.height - 10);
 
       resolve(canvas.toDataURL("image/jpeg", 0.85));
     };
