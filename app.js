@@ -388,26 +388,75 @@ small{color:#9db0ff}
       g.appendChild(wrap);
     });
   }
+// =========================
+// 🏷️ TAMPON DATE + GPS SUR PHOTO
+// =========================
+async function stampPhotoWithMeta(file, lat, lng) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      img.src = reader.result;
+    };
+
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+
+      canvas.width = img.width;
+      canvas.height = img.height;
+
+      // image originale
+      ctx.drawImage(img, 0, 0);
+
+      // bandeau bas
+      const padding = 20;
+      const bandHeight = 80;
+
+      ctx.fillStyle = "rgba(0,0,0,0.6)";
+      ctx.fillRect(0, canvas.height - bandHeight, canvas.width, bandHeight);
+
+      ctx.fillStyle = "#fff";
+      ctx.font = `${Math.max(22, canvas.width / 40)}px Arial`;
+
+      const dateStr = new Date().toLocaleString("fr-FR");
+      const coordStr = `Lat: ${lat.toFixed(6)} | Lng: ${lng.toFixed(6)}`;
+
+      ctx.fillText(dateStr, padding, canvas.height - 40);
+      ctx.fillText(coordStr, padding, canvas.height - 10);
+
+      resolve(canvas.toDataURL("image/jpeg", 0.85));
+    };
+
+    img.onerror = reject;
+    reader.onerror = reject;
+
+    reader.readAsDataURL(file);
+  });
+}
 
   async function readFilesAsDataUrls(files) {
-    const out = [];
-    for (const f of files) {
-      const dataUrl = await new Promise((resolve, reject) => {
-        const r = new FileReader();
-        r.onload = () => resolve(r.result);
-        r.onerror = () => reject(new Error("Lecture fichier impossible"));
-        r.readAsDataURL(f);
-      });
-      out.push({
-        name: f.name,
-        type: f.type,
-        size: f.size,
-        addedAt: Date.now(),
-        dataUrl,
-      });
-    }
-    return out;
+  const out = [];
+
+  const lat = parseFloat(latEl().value);
+  const lng = parseFloat(lngEl().value);
+
+  for (const f of files) {
+    const stampedDataUrl = await stampPhotoWithMeta(f, lat, lng);
+
+    out.push({
+      name: f.name,
+      type: f.type,
+      size: f.size,
+      addedAt: Date.now(),
+      dataUrl: stampedDataUrl,
+    });
   }
+
+  return out;
+}
+
 
   // =========================
   // LIST
