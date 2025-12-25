@@ -611,23 +611,31 @@ async function stampPhotoWithMeta(file, lat, lng) {
   // =========================
   // SELECT / FORM
   // =========================
-  function clearForm(keepCoords = true) {
-    speciesEl().value = "";
-    heightEl().value = "";
-    dbhEl().value = "";
-    secteurEl().value = "";
-    addressEl().value = "";
-    tagsEl().value = "";
-    commentEl().value = "";
-    cameraInput.value = "";
-galleryInput.value = "";
+ function clearForm(keepCoords = true) {
+  speciesEl().value = "";
+  heightEl().value = "";
+  dbhEl().value = "";
+  secteurEl().value = "";
+  addressEl().value = "";
+  tagsEl().value = "";
+  commentEl().value = "";
 
-    if (!keepCoords) {
-      latEl().value = "";
-      lngEl().value = "";
-    }
-    renderGallery([]);
+  const cam = document.getElementById("cameraInput");
+  const gal = document.getElementById("galleryInput");
+  const status = document.getElementById("photoStatus");
+
+  if (cam) cam.value = "";
+  if (gal) gal.value = "";
+  if (status) status.textContent = "";
+
+  if (!keepCoords) {
+    latEl().value = "";
+    lngEl().value = "";
   }
+
+  renderGallery([]);
+}
+
 
   function setSelected(id) {
     selectedId = id;
@@ -887,6 +895,25 @@ const pickGalleryBtn = document.getElementById("pickGalleryBtn");
 
 const cameraInput = document.getElementById("cameraInput");
 const galleryInput = document.getElementById("galleryInput");
+const photoStatus = document.getElementById("photoStatus");
+cameraInput.addEventListener("change", updatePhotoStatus);
+galleryInput.addEventListener("change", updatePhotoStatus);
+
+function updatePhotoStatus() {
+  const camCount = cameraInput.files ? cameraInput.files.length : 0;
+  const galCount = galleryInput.files ? galleryInput.files.length : 0;
+
+  if (camCount === 0 && galCount === 0) {
+    photoStatus.textContent = "";
+    return;
+  }
+
+  const parts = [];
+  if (camCount > 0) parts.push(`📸 ${camCount} photo${camCount > 1 ? "s" : ""}`);
+  if (galCount > 0) parts.push(`🖼️ ${galCount} photo${galCount > 1 ? "s" : ""}`);
+
+  photoStatus.textContent = parts.join(" • ");
+}
 
 // 📸 Caméra
 takePhotoBtn.onclick = () => {
@@ -1029,6 +1056,7 @@ if (undoBtn) {
       const lat = parseFloat(latEl().value);
       const lng = parseFloat(lngEl().value);
 
+
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
         alert("Merci de définir un emplacement (clique sur la carte).");
         return;
@@ -1069,7 +1097,8 @@ const photos = [...photosFromCamera, ...photosFromGallery];
 
         persistAndRefresh(t.id);
         cameraInput.value = "";
-galleryInput.value = "";
+        galleryInput.value = "";
+        photoStatus.textContent = "";
         alert("Arbre mis à jour.");
         return;
       }
@@ -1099,7 +1128,8 @@ galleryInput.value = "";
 
       treeIdEl().value = t.id;
       cameraInput.value = "";
-galleryInput.value = "";
+      galleryInput.value = "";
+      photoStatus.textContent = "";
       alert("Arbre ajouté.");
     };
   }
