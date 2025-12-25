@@ -220,10 +220,16 @@ function addLegendToMap() {
   legend.onAdd = function () {
     const div = L.DomUtil.create("div", "map-legend");
 
+    // ✅ FIX tablette / mobile
+    L.DomEvent.disableClickPropagation(div);
+    L.DomEvent.disableScrollPropagation(div);
+    L.DomEvent.on(div, "touchstart", L.DomEvent.stopPropagation);
+    L.DomEvent.on(div, "dblclick", L.DomEvent.stopPropagation);
+
     div.innerHTML = `
       <div class="legend-header">
         <b>Légende — Secteurs</b>
-        <button id="legendToggleBtn" title="Afficher / masquer">➖</button>
+        <button id="legendToggleBtn">➖</button>
       </div>
       <div id="legendContent"></div>
     `;
@@ -232,7 +238,6 @@ function addLegendToMap() {
 
     SECTEURS.forEach((secteur) => {
       const color = getColorFromSecteur(secteur);
-
       content.innerHTML += `
         <div class="legend-item">
           <span class="legend-icon" style="background:${color}"></span>
@@ -246,15 +251,12 @@ function addLegendToMap() {
 
   legend.addTo(map);
 
-  // toggle après insertion DOM
   setTimeout(() => {
     const btn = document.getElementById("legendToggleBtn");
     const content = document.getElementById("legendContent");
-
     if (!btn || !content) return;
 
     let open = true;
-
     btn.onclick = () => {
       open = !open;
       content.style.display = open ? "block" : "none";
@@ -262,6 +264,7 @@ function addLegendToMap() {
     };
   }, 0);
 }
+
 
 
   // =========================
