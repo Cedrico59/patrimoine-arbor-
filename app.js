@@ -874,6 +874,21 @@ map.on("tap", handleMapSelect);
 
   function wireUI() {
     qEl().addEventListener("input", () => renderList());
+const takePhotoBtn = document.getElementById("takePhotoBtn");
+const pickGalleryBtn = document.getElementById("pickGalleryBtn");
+
+const cameraInput = document.getElementById("cameraInput");
+const galleryInput = document.getElementById("galleryInput");
+
+// 📸 Caméra
+takePhotoBtn.onclick = () => {
+  cameraInput.click();
+};
+
+// 🖼️ Galerie
+pickGalleryBtn.onclick = () => {
+  galleryInput.click();
+};
 
     exportBtn().onclick = () => {
       const blob = new Blob([JSON.stringify({ exportedAt: Date.now(), trees }, null, 2)], {
