@@ -124,9 +124,14 @@ async function syncToSheets(treeObj) {
     const params = new URLSearchParams();
 
     for (const key in treeObj) {
-      const value = Array.isArray(treeObj[key])
-        ? treeObj[key].join(",")
-        : treeObj[key];
+      let value = treeObj[key];
+
+      if (key === "photos") {
+        // 🔥 FIX IMPORTANT
+        value = JSON.stringify(treeObj.photos || []);
+      } else if (Array.isArray(value)) {
+        value = value.join(",");
+      }
 
       params.append(key, value ?? "");
     }
@@ -135,10 +140,12 @@ async function syncToSheets(treeObj) {
       method: "POST",
       body: params
     });
+
   } catch (e) {
     console.warn("Sync Google Sheets échouée", e);
   }
 }
+
 
 async function deleteFromSheets(id) {
   try {
@@ -426,7 +433,7 @@ async function stampPhotoWithMeta(file, lat, lng) {
       ctx.fillText(dateStr, padding, canvas.height - 40);
       ctx.fillText(coordStr, padding, canvas.height - 10);
 
-      resolve(canvas.toDataURL("image/jpeg", 0.85));
+      resolve(canvas.toDataURL("image/jpeg", 0.7));
     };
 
     img.onerror = reject;
@@ -612,7 +619,8 @@ async function stampPhotoWithMeta(file, lat, lng) {
     addressEl().value = "";
     tagsEl().value = "";
     commentEl().value = "";
-    photosEl().value = "";
+    cameraInput.value = "";
+galleryInput.value = "";
 
     if (!keepCoords) {
       latEl().value = "";
@@ -1060,7 +1068,8 @@ const photos = [...photosFromCamera, ...photosFromGallery];
         await syncToSheets(t);
 
         persistAndRefresh(t.id);
-        photosEl().value = "";
+        cameraInput.value = "";
+galleryInput.value = "";
         alert("Arbre mis à jour.");
         return;
       }
@@ -1089,7 +1098,8 @@ const photos = [...photosFromCamera, ...photosFromGallery];
       persistAndRefresh(t.id);
 
       treeIdEl().value = t.id;
-      photosEl().value = "";
+      cameraInput.value = "";
+galleryInput.value = "";
       alert("Arbre ajouté.");
     };
   }
@@ -1105,11 +1115,12 @@ async function loadTreesFromSheets() {
     saveTreesLocal();
 
     console.log("📥 Données chargées depuis Google Sheets :", trees.length);
-  } catch (e) {
-    console.warn("⚠️ Impossible de charger depuis Sheets, fallback local", e);
-   await loadTreesFromSheets();
+  } 
+  catch (e) {
+  console.warn("⚠️ Impossible de charger depuis Sheets, fallback local", e);
+  trees = loadTrees(); // localStorage
+}
 
-  }
 }
 let isAgentMode = localStorage.getItem("agentMode") === "true";
 
