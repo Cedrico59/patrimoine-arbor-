@@ -119,34 +119,37 @@
   // =========================
   // GOOGLE SHEETS SYNC
   // =========================
-  async function syncToSheets(treeObj) {
-    try {
-      const params = new URLSearchParams();
-      for (const key in treeObj) {
-        const value = Array.isArray(treeObj[key]) ? treeObj[key].join(",") : treeObj[key];
-        if (key === "photos") {
-  params.append("photos", JSON.stringify(t.photos || []));
-} else {
-  params.append(key, value ?? "");
+ async function syncToSheets(treeObj) {
+  try {
+    const params = new URLSearchParams();
+
+    for (const key in treeObj) {
+      // 📸 CAS DES PHOTOS
+      if (key === "photos") {
+        params.append("photos", JSON.stringify(treeObj.photos || []));
+      }
+      // tableaux simples (tags, etc.)
+      else if (Array.isArray(treeObj[key])) {
+        params.append(key, treeObj[key].join(","));
+      }
+      // valeurs simples
+      else {
+        params.append(key, treeObj[key] ?? "");
+      }
+    }
+
+    console.log("📤 Envoi vers Sheets :", Object.fromEntries(params));
+
+    await fetch(API_URL, {
+      method: "POST",
+      body: params
+    });
+
+  } catch (e) {
+    console.warn("❌ Sync Google Sheets échouée", e);
+  }
 }
 
-      }
-      await fetch(API_URL, { method: "POST", body: params });
-    } catch (e) {
-      console.warn("Sync Google Sheets échouée", e);
-    }
-  }
-
-  async function deleteFromSheets(id) {
-    try {
-      const params = new URLSearchParams();
-      params.append("action", "delete");
-      params.append("id", id);
-      await fetch(API_URL, { method: "POST", body: params });
-    } catch (e) {
-      console.warn("Suppression Google Sheets échouée", e);
-    }
-  }
 
   // =========================
   // ICONS / COLORS
@@ -926,7 +929,8 @@ async function loadTreesFromSheets() {
     console.log("📥 Données chargées depuis Google Sheets :", trees.length);
   } catch (e) {
     console.warn("⚠️ Impossible de charger depuis Sheets, fallback local", e);
-    trees = loadTrees();
+   await loadTreesFromSheets();
+
   }
 }
 
