@@ -1198,9 +1198,6 @@ pendingPhotos = [];
       alert("Arbre ajouté.");
     };
   }
-async function loadTreesFromSheets() {
-  trees = loadTrees(); // ✅ uniquement localStorage
-}
 
 
 let isAgentMode = localStorage.getItem("agentMode") === "true";
