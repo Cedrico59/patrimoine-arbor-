@@ -117,24 +117,35 @@
     if (focusId) setSelected(focusId);
   }
 
-  // =========================
-  // GOOGLE SHEETS SYNC
-  // =========================
-async function syncToSheets(treeObj, newPhotos = []) {
+ async function syncToSheets(treeObj) {
   try {
     const params = new URLSearchParams();
 
     for (const key in treeObj) {
-      if (key === "photos") continue; // ❌ on ignore
-      const value = Array.isArray(treeObj[key])
-        ? treeObj[key].join(",")
-        : treeObj[key] ?? "";
-      params.append(key, value);
-    }
+      const value = treeObj[key];
 
-    // ✅ envoyer SEULEMENT les nouvelles photos
-    if (newPhotos.length > 0) {
-      params.append("photos", JSON.stringify(newPhotos));
+      // ✅ CAS SPÉCIAL PHOTOS
+      if (key === "photos") {
+        const newPhotos = (treeObj.photos || []).filter(
+          p => p.dataUrl && p.dataUrl.startsWith("data:")
+        );
+
+        // 👉 on envoie SEULEMENT s’il y a des photos
+        if (newPhotos.length > 0) {
+          params.append("photos", JSON.stringify(newPhotos));
+        }
+
+        continue; // ⛔ CRITIQUE : ne pas retomber dans le append générique
+      }
+
+      // tableaux simples
+      if (Array.isArray(value)) {
+        params.append(key, value.join(","));
+        continue;
+      }
+
+      // valeurs simples
+      params.append(key, value ?? "");
     }
 
     await fetch(API_URL, {
@@ -146,25 +157,6 @@ async function syncToSheets(treeObj, newPhotos = []) {
     console.warn("Sync Google Sheets échouée", e);
   }
 }
-
-
-
-async function deleteFromSheets(id) {
-  try {
-    const params = new URLSearchParams();
-    params.append("action", "delete");
-    params.append("id", id);
-
-    await fetch(API_URL, {
-      method: "POST",
-      body: params
-    });
-
-  } catch (e) {
-    console.warn("Suppression Google Sheets échouée", e);
-  }
-}
-
 
   // =========================
   // ICONS / COLORS
@@ -638,7 +630,7 @@ document.getElementById("photoCarousel")?.classList.add("hidden");
 
 
   function setSelected(id) {
-    pendingPhotos = []; // 🔥 CRITIQUE : reset état temporaire
+    
 
     selectedId = id;
     const t = id ? getTreeById(id) : null;
@@ -1127,10 +1119,10 @@ const photos = pendingPhotos.map(p => ({
         t.updatedAt = Date.now();
         t.photos = [...(t.photos || []), ...photos];
 
-        await syncToSheets(t, pendingPhotos);
-
+        await syncToSheets(t);
 
         persistAndRefresh(t.id);
+        pendingPhotos = [];
         cameraInput.value = "";
         galleryInput.value = "";
         photoStatus.textContent = "";
@@ -1156,11 +1148,11 @@ const photos = pendingPhotos.map(p => ({
         updatedAt: Date.now(),
       };
 
-      await syncToSheets(t, photos);
-
+      await syncToSheets(t);
 
       trees.unshift(t);
       persistAndRefresh(t.id);
+pendingPhotos = [];
 
       treeIdEl().value = t.id;
       cameraInput.value = "";
@@ -1177,8 +1169,13 @@ async function loadTreesFromSheets() {
     const data = await res.json();
     if (!Array.isArray(data)) throw new Error("Format Sheets invalide");
 
-    trees = data;
-    saveTreesLocal();
+   if (Array.isArray(data) && data.length > 0) {
+  trees = data;
+  saveTreesLocal();
+} else {
+  trees = loadTrees();
+}
+
 
     console.log("📥 Données chargées depuis Google Sheets :", trees.length);
   } 
