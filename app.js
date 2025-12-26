@@ -455,6 +455,26 @@ async function readFilesAsDataUrls(files) {
 }
 
 
+async function refreshFromSheets() {
+  try {
+    const res = await fetch(API_URL);
+    if (!res.ok) throw new Error("Sheets indisponible");
+
+    const data = await res.json();
+    if (!Array.isArray(data)) return;
+
+    trees = data;
+    saveTreesLocal();
+
+    renderMarkers();
+    renderList();
+    renderSecteurCount();
+
+    console.log("🔄 Données synchronisées depuis Sheets");
+  } catch (e) {
+    console.warn("Sync Sheets échouée", e);
+  }
+}
 
   // =========================
   // LIST
@@ -1120,6 +1140,7 @@ const photos = pendingPhotos.map(p => ({
         t.photos = [...(t.photos || []), ...photos];
 
         await syncToSheets(t);
+await refreshFromSheets();
 
         persistAndRefresh(t.id);
         pendingPhotos = [];
