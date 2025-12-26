@@ -1061,7 +1061,14 @@ if (toggleListBtn && treeListWrapper) {
     const params = new URLSearchParams();
     params.append("action", "delete");
     params.append("id", t.id);
-    await fetch(API_URL, { method: "POST", body: params });
+    await fetch(API_URL, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify(treeObj)
+});
+
   } catch (e) {
     console.warn("Suppression Google Sheets échouée", e);
   }
