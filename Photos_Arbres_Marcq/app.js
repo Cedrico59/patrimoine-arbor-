@@ -29,7 +29,6 @@
   let trees = [];
   let selectedId = null;
   let lastDeletedTree = null;
-  let pendingPhotos = [];
 
 
   const markers = new Map(); // id -> marker
@@ -117,46 +116,37 @@
     if (focusId) setSelected(focusId);
   }
 
- async function syncToSheets(treeObj) {
-  try {
-    const params = new URLSearchParams();
-
-    for (const key in treeObj) {
-      const value = treeObj[key];
-
-      // ✅ CAS SPÉCIAL PHOTOS
-      if (key === "photos") {
-        const newPhotos = (treeObj.photos || []).filter(
-          p => p.dataUrl && p.dataUrl.startsWith("data:")
-        );
-
-        // 👉 on envoie SEULEMENT s’il y a des photos
-        if (newPhotos.length > 0) {
-          params.append("photos", JSON.stringify(newPhotos));
-        }
-
-        continue; // ⛔ CRITIQUE : ne pas retomber dans le append générique
-      }
-
-      // tableaux simples
-      if (Array.isArray(value)) {
-        params.append(key, value.join(","));
-        continue;
-      }
-
-      // valeurs simples
-      params.append(key, value ?? "");
-    }
-
-    await fetch(API_URL, {
-      method: "POST",
-      body: params
-    });
-
-  } catch (e) {
-    console.warn("Sync Google Sheets échouée", e);
-  }
+  // =========================
+  // GOOGLE SHEETS SYNC
+  // =========================
+  async function syncToSheets(treeObj) {
+    try {
+      const params = new URLSearchParams();
+      for (const key in treeObj) {
+        const value = Array.isArray(treeObj[key]) ? treeObj[key].join(",") : treeObj[key];
+        if (key === "photos") {
+  params.append("photos", JSON.stringify(t.photos || []));
+} else {
+  params.append(key, value ?? "");
 }
+
+      }
+      await fetch(API_URL, { method: "POST", body: params });
+    } catch (e) {
+      console.warn("Sync Google Sheets échouée", e);
+    }
+  }
+
+  async function deleteFromSheets(id) {
+    try {
+      const params = new URLSearchParams();
+      params.append("action", "delete");
+      params.append("id", id);
+      await fetch(API_URL, { method: "POST", body: params });
+    } catch (e) {
+      console.warn("Suppression Google Sheets échouée", e);
+    }
+  }
 
   // =========================
   // ICONS / COLORS
@@ -220,26 +210,12 @@ function addLegendToMap() {
 
   legend.onAdd = function () {
     const div = L.DomUtil.create("div", "map-legend");
-
-    // ✅ FIX tablette / mobile
-    L.DomEvent.disableClickPropagation(div);
-    L.DomEvent.disableScrollPropagation(div);
-    L.DomEvent.on(div, "touchstart", L.DomEvent.stopPropagation);
-    L.DomEvent.on(div, "dblclick", L.DomEvent.stopPropagation);
-
-    div.innerHTML = `
-      <div class="legend-header">
-        <b>Légende — Secteurs</b>
-        <button id="legendToggleBtn">➖</button>
-      </div>
-      <div id="legendContent"></div>
-    `;
-
-    const content = div.querySelector("#legendContent");
+    div.innerHTML = "<b>Légende — Secteurs</b><br>";
 
     SECTEURS.forEach((secteur) => {
       const color = getColorFromSecteur(secteur);
-      content.innerHTML += `
+
+      div.innerHTML += `
         <div class="legend-item">
           <span class="legend-icon" style="background:${color}"></span>
           ${secteur}
@@ -251,22 +227,7 @@ function addLegendToMap() {
   };
 
   legend.addTo(map);
-
-  setTimeout(() => {
-    const btn = document.getElementById("legendToggleBtn");
-    const content = document.getElementById("legendContent");
-    if (!btn || !content) return;
-
-    let open = true;
-    btn.onclick = () => {
-      open = !open;
-      content.style.display = open ? "block" : "none";
-      btn.textContent = open ? "➖" : "➕";
-    };
-  }, 0);
 }
-
-
 
   // =========================
   // PREVIEW + NEW TAB
@@ -291,7 +252,15 @@ function addLegendToMap() {
     el("p-address").textContent = t.address || "—";
     el("p-comment").textContent = t.comment || "";
 
-   
+    const img = el("previewPhoto");
+    if (img) {
+      if (t.photos && t.photos.length > 0) {
+        img.src = t.photos[0].dataUrl;
+        img.style.display = "block";
+      } else {
+        img.style.display = "none";
+      }
+    }
   }
 
   // IMPORTANT: pour que onclick="openTreeInNewTab()" marche depuis HTML
@@ -368,12 +337,9 @@ small{color:#9db0ff}
         if (!selectedId) return;
         const t = getTreeById(selectedId);
         if (!t) return;
-        t.photos = (t.photos || []).filter(p => p.id !== photos[idx].id);
-
+        t.photos = (t.photos || []).filter((_, i) => i !== idx);
         t.updatedAt = Date.now();
         persistAndRefresh(t.id);
-renderPhotoCarousel(t.photos || []);
-
       };
 
       meta.appendChild(span);
@@ -384,97 +350,26 @@ renderPhotoCarousel(t.photos || []);
       g.appendChild(wrap);
     });
   }
-// =========================
-// 🏷️ TAMPON DATE + GPS SUR PHOTO
-// =========================
-async function stampPhotoWithMeta(file, lat, lng) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const reader = new FileReader();
 
-    reader.onload = () => {
-      img.src = reader.result;
-    };
-
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-
-      canvas.width = img.width;
-      canvas.height = img.height;
-
-      // image originale
-      ctx.drawImage(img, 0, 0);
-
-      // bandeau bas
-      const padding = 20;
-      const bandHeight = 80;
-
-      ctx.fillStyle = "rgba(0,0,0,0.6)";
-      ctx.fillRect(0, canvas.height - bandHeight, canvas.width, bandHeight);
-
-      ctx.fillStyle = "#fff";
-      ctx.font = `${Math.max(22, canvas.width / 40)}px Arial`;
-
-      const dateStr = new Date().toLocaleString("fr-FR");
-      const coordStr = `Lat: ${lat.toFixed(6)} | Lng: ${lng.toFixed(6)}`;
-
-      ctx.fillText(dateStr, padding, canvas.height - 40);
-      ctx.fillText(coordStr, padding, canvas.height - 10);
-
-      resolve(canvas.toDataURL("image/jpeg", 0.7));
-    };
-
-    img.onerror = reject;
-    reader.onerror = reject;
-
-    reader.readAsDataURL(file);
-  });
-}
-
-async function readFilesAsDataUrls(files) {
-  const out = [];
-
-  const lat = parseFloat(latEl().value);
-  const lng = parseFloat(lngEl().value);
-
-  for (const f of files) {
-    const stampedDataUrl = await stampPhotoWithMeta(f, lat, lng);
-
-    out.push({
-      id: crypto.randomUUID(), // ✅ CRITIQUE
-      name: f.name,
-      type: f.type,
-      size: f.size,
-      addedAt: Date.now(),
-      dataUrl: stampedDataUrl,
-    });
+  async function readFilesAsDataUrls(files) {
+    const out = [];
+    for (const f of files) {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result);
+        r.onerror = () => reject(new Error("Lecture fichier impossible"));
+        r.readAsDataURL(f);
+      });
+      out.push({
+        name: f.name,
+        type: f.type,
+        size: f.size,
+        addedAt: Date.now(),
+        dataUrl,
+      });
+    }
+    return out;
   }
-
-  return out;
-}
-
-
-async function refreshFromSheets() {
-  try {
-    const res = await fetch(API_URL);
-    if (!res.ok) throw new Error("Sheets indisponible");
-
-    const data = await res.json();
-    if (!Array.isArray(data)) return;
-
-    trees = data;
-    saveTreesLocal();
-
-    renderMarkers();
-    renderList();
-    renderSecteurCount();
-
-    console.log("🔄 Données synchronisées depuis Sheets");
-  } catch (e) {
-    console.warn("Sync Sheets échouée", e);
-  }
-}
 
   // =========================
   // LIST
@@ -622,36 +517,24 @@ async function refreshFromSheets() {
   // =========================
   // SELECT / FORM
   // =========================
- function clearForm(keepCoords = true) {
-  speciesEl().value = "";
-  heightEl().value = "";
-  dbhEl().value = "";
-  secteurEl().value = "";
-  addressEl().value = "";
-  tagsEl().value = "";
-  commentEl().value = "";
-document.getElementById("photoCarousel")?.classList.add("hidden");
+  function clearForm(keepCoords = true) {
+    speciesEl().value = "";
+    heightEl().value = "";
+    dbhEl().value = "";
+    secteurEl().value = "";
+    addressEl().value = "";
+    tagsEl().value = "";
+    commentEl().value = "";
+    photosEl().value = "";
 
-  const cam = document.getElementById("cameraInput");
-  const gal = document.getElementById("galleryInput");
-  const status = document.getElementById("photoStatus");
-
-  if (cam) cam.value = "";
-  if (gal) gal.value = "";
-  if (status) status.textContent = "";
-
-  if (!keepCoords) {
-    latEl().value = "";
-    lngEl().value = "";
+    if (!keepCoords) {
+      latEl().value = "";
+      lngEl().value = "";
+    }
+    renderGallery([]);
   }
 
-  renderGallery([]);
-}
-
-
   function setSelected(id) {
-    
-
     selectedId = id;
     const t = id ? getTreeById(id) : null;
 
@@ -681,16 +564,8 @@ document.getElementById("photoCarousel")?.classList.add("hidden");
     tagsEl().value = (t.tags || []).join(", ");
     commentEl().value = t.comment || "";
 
-  // ⚠️ Affichage des photos UNIQUEMENT si arbre déjà enregistré
-if (t.photos && t.photos.length > 0) {
-  renderGallery(t.photos);
-  renderPhotoCarousel(t.photos);
-} else {
-  document.getElementById("photoCarousel")?.classList.add("hidden");
-}
-
-renderTreePreview(t);
-
+    renderGallery(t.photos || []);
+    renderTreePreview(t);
   }
 
   // =========================
@@ -805,58 +680,6 @@ renderTreePreview(t);
       console.warn("Erreur chargement contour commune", err);
     }
   }
-// =========================
-// 📍 GEOLOCALISATION GPS
-// =========================
-function locateUserGPS() {
-
-  if (!navigator.geolocation) {
-    alert("La géolocalisation n’est pas supportée sur cet appareil.");
-    return;
-  }
-
-  navigator.geolocation.getCurrentPosition(
-    (position) => {
-      const lat = position.coords.latitude;
-      const lng = position.coords.longitude;
-
-      // 🗺️ centre la carte
-      map.setView([lat, lng], 17);
-
-      // ✏️ prépare une nouvelle fiche
-      selectedId = null;
-      deleteBtn().disabled = true;
-
-      editorTitle().textContent = "Ajouter un arbre (GPS)";
-      editorHint().textContent = "Position GPS détectée automatiquement.";
-
-      clearForm(false);
-      latEl().value = fmtCoord(lat);
-      lngEl().value = fmtCoord(lng);
-
-      renderTreePreview(null);
-      highlightListSelection();
-
-      // 📍 marqueur temporaire
-      L.circleMarker([lat, lng], {
-        radius: 8,
-        color: "#00e5ff",
-        fillColor: "#00e5ff",
-        fillOpacity: 0.9
-      }).addTo(map);
-
-    },
-    (err) => {
-      alert("Impossible d’obtenir la position GPS.");
-      console.error(err);
-    },
-    {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 0
-    }
-  );
-}
 
   // =========================
   // INIT
@@ -873,104 +696,35 @@ function locateUserGPS() {
       attribution: "&copy; OpenStreetMap",
     }).addTo(map);
 
-   // 📍 Sélection emplacement (PC + mobile)
-function handleMapSelect(e) {
+    // Click map => coords nouvelle fiche
+    map.on("click", (e) => {
+      // si contour chargé + pip dispo => imposer dans la commune
+      if (cityLayer && typeof leafletPip !== "undefined") {
+        const inside = leafletPip.pointInLayer([e.latlng.lng, e.latlng.lat], cityLayer).length > 0;
+        if (!inside) {
+          alert("⛔ L’arbre doit être situé dans Marcq-en-Barœul");
+          return;
+        }
+      }
 
-  // si contour chargé + pip dispo => imposer dans la commune
-  if (cityLayer && typeof leafletPip !== "undefined") {
-    const inside = leafletPip.pointInLayer(
-      [e.latlng.lng, e.latlng.lat],
-      cityLayer
-    ).length > 0;
+      const { lat, lng } = e.latlng;
+      selectedId = null;
 
-    if (!inside) {
-      alert("⛔ L’arbre doit être situé dans Marcq-en-Barœul");
-      return;
-    }
-  }
+      deleteBtn().disabled = true;
+      editorTitle().textContent = "Ajouter un arbre";
+      editorHint().textContent = "Complète la fiche puis clique sur Enregistrer.";
 
-  const { lat, lng } = e.latlng;
-  selectedId = null;
+      clearForm(false);
+      latEl().value = fmtCoord(lat);
+      lngEl().value = fmtCoord(lng);
 
-  deleteBtn().disabled = true;
-  editorTitle().textContent = "Ajouter un arbre";
-  editorHint().textContent = "Complète la fiche puis clique sur Enregistrer.";
-
-  clearForm(false);
-  latEl().value = fmtCoord(lat);
-  lngEl().value = fmtCoord(lng);
-
-  renderTreePreview(null);
-  highlightListSelection();
-}
-
-// 👇 IMPORTANT : PC + MOBILE
-map.on("click", handleMapSelect);
-map.on("tap", handleMapSelect);
-
+      renderTreePreview(null);
+      highlightListSelection();
+    });
   }
 
   function wireUI() {
     qEl().addEventListener("input", () => renderList());
-const takePhotoBtn = document.getElementById("takePhotoBtn");
-const pickGalleryBtn = document.getElementById("pickGalleryBtn");
-
-const cameraInput = document.getElementById("cameraInput");
-const galleryInput = document.getElementById("galleryInput");
-const photoStatus = document.getElementById("photoStatus");
-// 📸 stockage temporaire des photos (IMPORTANT mobile)
-
-
-// 📸 Caméra (mobile compatible)
-cameraInput.addEventListener("change", async () => {
-  if (!cameraInput.files || !cameraInput.files[0]) return;
-
-  const photos = await readFilesAsDataUrls(cameraInput.files);
-  pendingPhotos.push(...photos);
-
-  cameraInput.value = "";
-
-  updatePhotoStatus();
-  renderGallery(pendingPhotos);
-  renderPhotoCarousel(pendingPhotos); // ✅ AJOUT
-});
-
-
-// 🖼️ Galerie
-galleryInput.addEventListener("change", async () => {
-  if (!galleryInput.files || galleryInput.files.length === 0) return;
-
-  const photos = await readFilesAsDataUrls(galleryInput.files);
-  pendingPhotos.push(...photos);
-
-  galleryInput.value = ""; // reset
-
-  updatePhotoStatus();
-  renderGallery(pendingPhotos);
-  renderPhotoCarousel(pendingPhotos);
-
-});
-
-
-function updatePhotoStatus() {
-  if (pendingPhotos.length === 0) {
-    photoStatus.textContent = "";
-    return;
-  }
-
-  photoStatus.textContent = `📷 ${pendingPhotos.length} photo${pendingPhotos.length > 1 ? "s" : ""} ajoutée${pendingPhotos.length > 1 ? "s" : ""}`;
-}
-
-
-// 📸 Caméra
-takePhotoBtn.onclick = () => {
-  cameraInput.click();
-};
-
-// 🖼️ Galerie
-pickGalleryBtn.onclick = () => {
-  galleryInput.click();
-};
 
     exportBtn().onclick = () => {
       const blob = new Blob([JSON.stringify({ exportedAt: Date.now(), trees }, null, 2)], {
@@ -985,10 +739,6 @@ pickGalleryBtn.onclick = () => {
     };
 const toggleListBtn = el("toggleListBtn");
 const treeListWrapper = el("treeListWrapper");
-const gpsBtn = el("gpsBtn");
-if (gpsBtn) {
-  gpsBtn.onclick = () => locateUserGPS();
-}
 
 if (toggleListBtn && treeListWrapper) {
   let collapsed = false;
@@ -1029,8 +779,6 @@ if (toggleListBtn && treeListWrapper) {
     };
 
     newBtn().onclick = () => {
-    pendingPhotos = []; // 🔥 reset photos temporaires
-
       selectedId = null;
       deleteBtn().disabled = true;
       editorTitle().textContent = "Ajouter un arbre";
@@ -1041,7 +789,7 @@ if (toggleListBtn && treeListWrapper) {
       renderTreePreview(null);
     };
 
- deleteBtn().onclick = async () => {
+    deleteBtn().onclick = async () => {
   if (!selectedId) return;
   if (!confirm("Supprimer cet arbre ?")) return;
 
@@ -1052,30 +800,24 @@ if (toggleListBtn && treeListWrapper) {
   lastDeletedTree = { ...t };
 
   // 🔗 suppression Google Sheets
-  try {
-    const params = new URLSearchParams();
-    params.append("action", "delete");
-    params.append("id", t.id);
-    await fetch(API_URL, { method: "POST", body: params });
-  } catch (e) {
-    console.warn("Suppression Google Sheets échouée", e);
-  }
+  await deleteFromSheets(t.id);
 
   // 🗑️ suppression locale
   trees = trees.filter(x => x.id !== t.id);
   removeMarker(t.id);
   selectedId = null;
+
   saveTreesLocal();
   renderMarkers();
   renderList();
   renderSecteurCount();
   setSelected(null);
+  renderTreePreview(null);
 
-  // 👀 afficher bouton Annuler
+  // 👀 afficher le bouton Annuler
   const undoBtn = el("undoBtn");
   if (undoBtn) undoBtn.style.display = "inline-block";
 };
-
 const undoBtn = el("undoBtn");
 if (undoBtn) {
   undoBtn.onclick = async () => {
@@ -1105,21 +847,16 @@ if (undoBtn) {
       const lat = parseFloat(latEl().value);
       const lng = parseFloat(lngEl().value);
 
-
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
         alert("Merci de définir un emplacement (clique sur la carte).");
         return;
       }
 
       const quartier = getQuartierFromLatLng(lat, lng);
-const photos = pendingPhotos.map(p => ({
-  id: p.id,
-  name: p.name,
-  addedAt: p.addedAt,
-  dataUrl: p.dataUrl
-}));
-
-
+      const photos =
+        photosEl().files && photosEl().files.length
+          ? await readFilesAsDataUrls(photosEl().files)
+          : [];
 
       if (selectedId) {
         // update
@@ -1140,16 +877,9 @@ const photos = pendingPhotos.map(p => ({
         t.photos = [...(t.photos || []), ...photos];
 
         await syncToSheets(t);
-        await loadTreesFromSheets();
-persistAndRefresh(t.id);
-
-await refreshFromSheets();
 
         persistAndRefresh(t.id);
-        pendingPhotos = [];
-        cameraInput.value = "";
-        galleryInput.value = "";
-        photoStatus.textContent = "";
+        photosEl().value = "";
         alert("Arbre mis à jour.");
         return;
       }
@@ -1176,21 +906,16 @@ await refreshFromSheets();
 
       trees.unshift(t);
       persistAndRefresh(t.id);
-pendingPhotos = [];
 
       treeIdEl().value = t.id;
-      cameraInput.value = "";
-      galleryInput.value = "";
-      photoStatus.textContent = "";
+      photosEl().value = "";
       alert("Arbre ajouté.");
     };
   }
 async function loadTreesFromSheets() {
   try {
-    const url = API_URL + "?_=" + Date.now(); // ✅ anti-cache
-    const res = await fetch(url, { cache: "no-store" }); // ✅ anti-cache navigateur
-
-    if (!res.ok) throw new Error("Sheets indisponible: " + res.status);
+    const res = await fetch(API_URL);
+    if (!res.ok) throw new Error("Sheets indisponible");
 
     const data = await res.json();
     if (!Array.isArray(data)) throw new Error("Format Sheets invalide");
@@ -1201,29 +926,9 @@ async function loadTreesFromSheets() {
     console.log("📥 Données chargées depuis Google Sheets :", trees.length);
   } catch (e) {
     console.warn("⚠️ Impossible de charger depuis Sheets, fallback local", e);
-    trees = loadTrees(); // localStorage
+    trees = loadTrees();
   }
 }
-
-let isAgentMode = localStorage.getItem("agentMode") === "true";
-
-function applyAgentMode() {
-  document.body.classList.toggle("agent-mode", isAgentMode);
-  localStorage.setItem("agentMode", isAgentMode);
-
-  const btn = document.getElementById("agentModeBtn");
-  if (btn) {
-    btn.textContent = isAgentMode ? "🖥️ Mode bureau" : "📱 Mode agent";
-  }
-}
-
-document.getElementById("agentModeBtn")?.addEventListener("click", () => {
-  isAgentMode = !isAgentMode;
-  applyAgentMode();
-});
-
-// appliquer au chargement
-applyAgentMode();
 
   // =========================
   // START
@@ -1257,55 +962,4 @@ applyAgentMode();
 
     console.log("✅ App chargée (A+B+C+D).");
   });
-
-  let carouselIndex = 0;
-let carouselPhotos = [];
-
-function renderPhotoCarousel(photos) {
-  const box = document.getElementById("photoCarousel");
-  const img = document.getElementById("carouselImage");
-  const count = document.getElementById("carouselCount");
-
-  if (!photos || photos.length === 0) {
-    box.classList.add("hidden");
-    return;
-  }
-
-  carouselPhotos = photos;
-  carouselIndex = Math.min(carouselIndex, photos.length - 1);
-
-
-  box.classList.remove("hidden");
-  updateCarousel();
-
-  // boutons (UNE SEULE FOIS)
-  box.querySelector(".left").onclick = () => {
-    carouselIndex = (carouselIndex - 1 + carouselPhotos.length) % carouselPhotos.length;
-    updateCarousel();
-  };
-
-  box.querySelector(".right").onclick = () => {
-    carouselIndex = (carouselIndex + 1) % carouselPhotos.length;
-    updateCarousel();
-  };
-
-  // 📱 swipe tactile
-  let startX = 0;
-  img.ontouchstart = (e) => startX = e.touches[0].clientX;
-  img.ontouchend = (e) => {
-    const dx = e.changedTouches[0].clientX - startX;
-    if (dx > 50) box.querySelector(".left").click();
-    if (dx < -50) box.querySelector(".right").click();
-  };
-}
-
-function updateCarousel() {
-  const img = document.getElementById("carouselImage");
-  const count = document.getElementById("carouselCount");
-
-  img.src = carouselPhotos[carouselIndex].dataUrl;
-  count.textContent = `${carouselIndex + 1} / ${carouselPhotos.length}`;
-}
-
-
 })();

@@ -108,89 +108,6 @@
 #treeListWrapper {
   margin-top: 10px;
 }
-.carousel {
-  position: relative;
-  width: 100%;
-  max-height: 320px;
-  margin-bottom: 12px;
-  text-align: center;
-}
-
-.carousel img {
-  max-width: 100%;
-  max-height: 320px;
-  object-fit: contain;
-  border-radius: 12px;
-}
-
-.carousel-btn {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  background: rgba(0,0,0,0.5);
-  border: none;
-  color: white;
-  font-size: 22px;
-  padding: 6px 10px;
-  cursor: pointer;
-  border-radius: 50%;
-}
-
-.carousel-btn.left { left: 8px; }
-.carousel-btn.right { right: 8px; }
-
-#carouselCount {
-  font-size: 12px;
-  opacity: 0.7;
-  margin-top: 4px;
-}
-
-.hidden {
-  display: none;
-}
-
-/* =========================
-   MODE AGENT TERRAIN
-========================= */
-
-body.agent-mode main {
-  grid-template-columns: 1fr;
-}
-
-/* Carte prioritaire */
-body.agent-mode #map {
-  height: 100vh;
-}
-
-/* Panneau fiche = bottom sheet */
-body.agent-mode aside {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 42vh;
-  z-index: 1000;
-  border-radius: 18px 18px 0 0;
-  overflow-y: auto;
-}
-
-/* Masquer éléments non terrain */
-body.agent-mode #secteurCount,
-body.agent-mode .export,
-body.agent-mode #importBtn {
-  display: none;
-}
-
-/* Boutons plus gros */
-body.agent-mode button {
-  font-size: 16px;
-  padding: 14px;
-}
-.photo-status {
-  margin-top: 6px;
-  font-size: 0.85em;
-  color: #9db0ff;
-}
 
   </style>
 </head>
@@ -203,12 +120,6 @@ body.agent-mode button {
     <h1>Patrimoine arboré — Ville de Marcq-en-Barœul</h1>
     <span class="badge">Clique sur la carte pour ajouter un arbre</span>
   </div>
-
-<button id="agentModeBtn" class="secondary">
-  📱 Mode agent
-</button>
-
-
 </header>
 
 <main>
@@ -219,18 +130,12 @@ body.agent-mode button {
     <div class="card" id="treePreview" style="display:none;">
       <h2>Fiche de l’arbre</h2>
 
-      
-
-  <!-- 🖼️ CARROUSEL PHOTOS -->
-  <div id="photoCarousel" class="carousel hidden">
-    <button class="carousel-btn left">⬅️</button>
-    <img id="carouselImage" />
-    <button class="carousel-btn right">➡️</button>
-    <div id="carouselCount"></div>
-  </div>
-
-</div>
-
+      <img
+        id="previewPhoto"
+        class="preview-photo"
+        style="cursor:pointer"
+        onclick="openTreeInNewTab()"
+      />
 
       <div class="preview-info">
         <p><b>ID :</b> <span id="p-id"></span></p>
@@ -298,10 +203,6 @@ body.agent-mode button {
       <div class="row">
         <input id="lat" type="number" step="0.000001" placeholder="Latitude" />
         <input id="lng" type="number" step="0.000001" placeholder="Longitude" />
-        <button id="gpsBtn" class="secondary">
-  📍 Utiliser ma position GPS
-</button>
-
       </div>
 
       <label>Espèce (si connue)</label>
@@ -342,38 +243,7 @@ body.agent-mode button {
       <textarea id="comment" placeholder="Note d’observation, état sanitaire, histoire, etc."></textarea>
 
       <label>Photos (jpg/png)</label>
-  <div class="photo-actions">
-  <button type="button" id="takePhotoBtn" class="secondary">
-    📸 Prendre une photo
-  </button>
-
-  <button type="button" id="pickGalleryBtn" class="secondary">
-    🖼️ Choisir depuis la galerie
-  </button>
-
-  <div id="photoStatus" class="photo-status"></div>
-
-  <!-- Inputs cachés -->
-  <input
-    type="file"
-    id="cameraInput"
-    accept="image/*"
-    capture="environment"
-    hidden
-  >
-
-  <input
-    type="file"
-    id="galleryInput"
-    accept="image/*"
-    multiple
-    hidden
-  >
-</div>
-
-
->
-
+      <input id="photos" type="file" accept="image/*" multiple />
 
       <div class="btns">
         <button id="saveBtn">Enregistrer</button>
