@@ -1199,24 +1199,9 @@ pendingPhotos = [];
     };
   }
 async function loadTreesFromSheets() {
-  try {
-    const url = API_URL + "?_=" + Date.now(); // ✅ anti-cache
-    const res = await fetch(url, { cache: "no-store" }); // ✅ anti-cache navigateur
-
-    if (!res.ok) throw new Error("Sheets indisponible: " + res.status);
-
-    const data = await res.json();
-    if (!Array.isArray(data)) throw new Error("Format Sheets invalide");
-
-    trees = data;
-    saveTreesLocal();
-
-    console.log("📥 Données chargées depuis Google Sheets :", trees.length);
-  } catch (e) {
-    console.warn("⚠️ Impossible de charger depuis Sheets, fallback local", e);
-    trees = loadTrees(); // localStorage
-  }
+  trees = loadTrees(); // ✅ uniquement localStorage
 }
+
 
 let isAgentMode = localStorage.getItem("agentMode") === "true";
 
