@@ -3,14 +3,20 @@ function myFunction() {}
 /* =========================
    CORS HELPERS
 ========================= */
-function corsResponse(text) {
-  return ContentService
-    .createTextOutput(text)
-    .setMimeType(ContentService.MimeType.TEXT)
-    .setHeader("Access-Control-Allow-Origin", "*")
-    .setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-    .setHeader("Access-Control-Allow-Headers", "Content-Type");
+function corsResponse(json) {
+  const output = ContentService
+    .createTextOutput(json)
+    .setMimeType(ContentService.MimeType.JSON);
+
+  output.addHeader("Access-Control-Allow-Origin", "*");
+  output.addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  output.addHeader("Access-Control-Allow-Headers", "Content-Type");
+  output.addHeader("Cache-Control", "no-store, no-cache, max-age=0");
+
+  return output;
 }
+
+
 
 function doOptions() {
   return corsResponse("");
@@ -20,13 +26,14 @@ function doOptions() {
    GET – LECTURE DES ARBRES
 ========================= */
 function doGet() {
-  const sheet = SpreadsheetApp
-    .getActiveSpreadsheet()
+  const sheet = SpreadsheetApp.getActive()
     .getSheetByName("arbres");
 
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) {
-    return corsResponse(JSON.stringify([]));
+    return ContentService
+      .createTextOutput(JSON.stringify([]))
+      .setMimeType(ContentService.MimeType.JSON);
   }
 
   const values = sheet
@@ -45,11 +52,14 @@ function doGet() {
     address: row[8],
     tags: row[9] ? row[9].split(",") : [],
     comment: row[10],
-    photos: [], // les photos restent locales côté app
+    photos: [],
+    quartier: row[12] || "Inconnu",
     updatedAt: Date.now()
   }));
 
-  return corsResponse(JSON.stringify(trees));
+  return ContentService
+    .createTextOutput(JSON.stringify(trees))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 /* =========================
@@ -165,7 +175,8 @@ function doPost(e) {
     data.address || "",
     data.tags || "",
     data.comment || "",
-    photoUrls.join(",")
+    photoUrls.join(","),
+    data.quartier || ""   // 👈 AJOUT
   ];
 
   /* ===== UPDATE ===== */

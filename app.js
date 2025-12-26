@@ -449,6 +449,14 @@ async function readFilesAsDataUrls(files) {
       addedAt: Date.now(),
       dataUrl: stampedDataUrl,
     });
+    out.push({
+  id: crypto.randomUUID(),
+  name: f.name,
+  addedAt: Date.now(),
+  dataUrl: stampedDataUrl,
+  synced: false   // 👈 CRITIQUE
+});
+
   }
 
   return out;
@@ -651,6 +659,7 @@ document.getElementById("photoCarousel")?.classList.add("hidden");
 
   function setSelected(id) {
     
+pendingPhotos = [];
 
     selectedId = id;
     const t = id ? getTreeById(id) : null;
@@ -931,8 +940,15 @@ cameraInput.addEventListener("change", async () => {
   cameraInput.value = "";
 
   updatePhotoStatus();
-  renderGallery(pendingPhotos);
-  renderPhotoCarousel(pendingPhotos); // ✅ AJOUT
+  const t = selectedId ? getTreeById(selectedId) : null;
+const allPhotos = [
+  ...(t?.photos || []),
+  ...pendingPhotos
+];
+
+renderGallery(allPhotos);
+renderPhotoCarousel(allPhotos);
+
 });
 
 
@@ -1121,38 +1137,41 @@ const photos = pendingPhotos.map(p => ({
 
 
 
-      if (selectedId) {
-        // update
-        const t = getTreeById(selectedId);
-        if (!t) return;
+if (selectedId) {
+  // update
+  const t = getTreeById(selectedId);
+  if (!t) return;
 
-        t.lat = lat;
-        t.lng = lng;
-        t.quartier = quartier;
-        t.species = speciesEl().value.trim();
-        t.height = heightEl().value === "" ? null : Number(heightEl().value);
-        t.dbh = dbhEl().value === "" ? null : Number(dbhEl().value);
-        t.secteur = secteurEl().value;
-        t.address = addressEl().value.trim();
-        t.tags = normalizeTags(tagsEl().value);
-        t.comment = commentEl().value.trim();
-        t.updatedAt = Date.now();
-        t.photos = [...(t.photos || []), ...photos];
+  t.lat = lat;
+  t.lng = lng;
+  t.quartier = quartier;
+  t.species = speciesEl().value.trim();
+  t.height = heightEl().value === "" ? null : Number(heightEl().value);
+  t.dbh = dbhEl().value === "" ? null : Number(dbhEl().value);
+  t.secteur = secteurEl().value;
+  t.address = addressEl().value.trim();
+  t.tags = normalizeTags(tagsEl().value);
+  t.comment = commentEl().value.trim();
 
-        await syncToSheets(t);
-        await loadTreesFromSheets();
-persistAndRefresh(t.id);
+  // 🔥 photos : fusion définitive
+  t.photos = [...(t.photos || []), ...pendingPhotos];
+  pendingPhotos = [];
 
-await refreshFromSheets();
+  t.updatedAt = Date.now();
 
-        persistAndRefresh(t.id);
-        pendingPhotos = [];
-        cameraInput.value = "";
-        galleryInput.value = "";
-        photoStatus.textContent = "";
-        alert("Arbre mis à jour.");
-        return;
-      }
+  saveTreesLocal();        // 💾 local OK
+  await syncToSheets(t);  // ☁️ Sheets (métadonnées seulement)
+
+  persistAndRefresh(t.id); // 🔁 UI + carte + liste
+
+  cameraInput.value = "";
+  galleryInput.value = "";
+  photoStatus.textContent = "";
+
+  alert("Arbre mis à jour.");
+  return;
+}
+
 
       // create
       const t = {
@@ -1307,5 +1326,45 @@ function updateCarousel() {
   count.textContent = `${carouselIndex + 1} / ${carouselPhotos.length}`;
 }
 
+async function syncPhotosToDrive() {
+  if (!selectedId) return;
+
+  const t = getTreeById(selectedId);
+  if (!t || !t.photos?.length) return;
+
+  const unsynced = t.photos.filter(p => !p.synced);
+  if (unsynced.length === 0) {
+    alert("Toutes les photos sont déjà synchronisées.");
+    return;
+  }
+
+  for (const p of unsynced) {
+    try {
+      const params = new URLSearchParams();
+      params.append("action", "uploadPhoto");
+      params.append("id", t.id);
+      params.append("name", p.name);
+      params.append("dataUrl", p.dataUrl);
+
+      const res = await fetch(API_URL, {
+        method: "POST",
+        body: params
+      });
+
+      if (res.ok) {
+        p.synced = true; // ✅ marquée comme synchronisée
+      }
+    } catch (e) {
+      console.warn("Sync photo échouée", e);
+      break;
+    }
+  }
+
+  saveTreesLocal();
+  persistAndRefresh(t.id);
+
+  alert("Synchronisation Drive terminée.");
+}
+document.getElementById("syncPhotosBtn").onclick = syncPhotosToDrive;
 
 })();
