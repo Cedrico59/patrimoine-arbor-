@@ -637,6 +637,8 @@ document.getElementById("photoCarousel")?.classList.add("hidden");
 
 
   function setSelected(id) {
+    pendingPhotos = []; // 🔥 CRITIQUE : reset état temporaire
+
     selectedId = id;
     const t = id ? getTreeById(id) : null;
 
@@ -1014,6 +1016,8 @@ if (toggleListBtn && treeListWrapper) {
     };
 
     newBtn().onclick = () => {
+    pendingPhotos = []; // 🔥 reset photos temporaires
+
       selectedId = null;
       deleteBtn().disabled = true;
       editorTitle().textContent = "Ajouter un arbre";
@@ -1095,11 +1099,14 @@ if (undoBtn) {
       }
 
       const quartier = getQuartierFromLatLng(lat, lng);
-const photos = pendingPhotos;
+const photos = pendingPhotos.map(p => ({
+  id: p.id,
+  name: p.name,
+  addedAt: p.addedAt,
+  dataUrl: p.dataUrl
+}));
 
-pendingPhotos = [];
-renderGallery([]);
-photoStatus.textContent = "";
+
 
       if (selectedId) {
         // update
