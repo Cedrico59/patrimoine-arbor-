@@ -1140,6 +1140,9 @@ const photos = pendingPhotos.map(p => ({
         t.photos = [...(t.photos || []), ...photos];
 
         await syncToSheets(t);
+        await loadTreesFromSheets();
+persistAndRefresh(t.id);
+
 await refreshFromSheets();
 
         persistAndRefresh(t.id);
@@ -1184,28 +1187,24 @@ pendingPhotos = [];
   }
 async function loadTreesFromSheets() {
   try {
-    const res = await fetch(API_URL);
-    if (!res.ok) throw new Error("Sheets indisponible");
+    const url = API_URL + "?_=" + Date.now(); // ✅ anti-cache
+    const res = await fetch(url, { cache: "no-store" }); // ✅ anti-cache navigateur
+
+    if (!res.ok) throw new Error("Sheets indisponible: " + res.status);
 
     const data = await res.json();
     if (!Array.isArray(data)) throw new Error("Format Sheets invalide");
 
-   if (Array.isArray(data) && data.length > 0) {
-  trees = data;
-  saveTreesLocal();
-} else {
-  trees = loadTrees();
-}
-
+    trees = data;
+    saveTreesLocal();
 
     console.log("📥 Données chargées depuis Google Sheets :", trees.length);
-  } 
-  catch (e) {
-  console.warn("⚠️ Impossible de charger depuis Sheets, fallback local", e);
-  trees = loadTrees(); // localStorage
+  } catch (e) {
+    console.warn("⚠️ Impossible de charger depuis Sheets, fallback local", e);
+    trees = loadTrees(); // localStorage
+  }
 }
 
-}
 let isAgentMode = localStorage.getItem("agentMode") === "true";
 
 function applyAgentMode() {
