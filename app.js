@@ -120,21 +120,21 @@
   // =========================
   // GOOGLE SHEETS SYNC
   // =========================
-async function syncToSheets(treeObj) {
+async function syncToSheets(treeObj, newPhotos = []) {
   try {
     const params = new URLSearchParams();
 
     for (const key in treeObj) {
-      let value = treeObj[key];
+      if (key === "photos") continue; // ❌ on ignore
+      const value = Array.isArray(treeObj[key])
+        ? treeObj[key].join(",")
+        : treeObj[key] ?? "";
+      params.append(key, value);
+    }
 
-      if (key === "photos") {
-        // 🔥 FIX IMPORTANT
-        value = JSON.stringify(treeObj.photos || []);
-      } else if (Array.isArray(value)) {
-        value = value.join(",");
-      }
-
-      params.append(key, value ?? "");
+    // ✅ envoyer SEULEMENT les nouvelles photos
+    if (newPhotos.length > 0) {
+      params.append("photos", JSON.stringify(newPhotos));
     }
 
     await fetch(API_URL, {
@@ -146,6 +146,7 @@ async function syncToSheets(treeObj) {
     console.warn("Sync Google Sheets échouée", e);
   }
 }
+
 
 
 async function deleteFromSheets(id) {
@@ -1126,7 +1127,8 @@ const photos = pendingPhotos.map(p => ({
         t.updatedAt = Date.now();
         t.photos = [...(t.photos || []), ...photos];
 
-        await syncToSheets(t);
+        await syncToSheets(t, pendingPhotos);
+
 
         persistAndRefresh(t.id);
         cameraInput.value = "";
@@ -1154,7 +1156,8 @@ const photos = pendingPhotos.map(p => ({
         updatedAt: Date.now(),
       };
 
-      await syncToSheets(t);
+      await syncToSheets(t, photos);
+
 
       trees.unshift(t);
       persistAndRefresh(t.id);
