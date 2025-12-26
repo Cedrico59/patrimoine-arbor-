@@ -117,25 +117,24 @@
     if (focusId) setSelected(focusId);
   }
 
- async function syncToSheets(treeObj) {
+async function syncToSheets(treeObj) {
   try {
     const params = new URLSearchParams();
 
     for (const key in treeObj) {
       const value = treeObj[key];
 
-      // ✅ CAS SPÉCIAL PHOTOS
+      // 📸 PHOTOS : on n’envoie QUE les nouvelles (dataUrl)
       if (key === "photos") {
         const newPhotos = (treeObj.photos || []).filter(
           p => p.dataUrl && p.dataUrl.startsWith("data:")
         );
 
-        // 👉 on envoie SEULEMENT s’il y a des photos
         if (newPhotos.length > 0) {
           params.append("photos", JSON.stringify(newPhotos));
         }
 
-        continue; // ⛔ CRITIQUE : ne pas retomber dans le append générique
+        continue; // ⛔ très important
       }
 
       // tableaux simples
@@ -148,15 +147,29 @@
       params.append(key, value ?? "");
     }
 
+    // ☁️ ENVOI VERS GOOGLE SHEETS + DRIVE
     await fetch(API_URL, {
-      method: "POST",
-      body: params
-    });
+  method: "POST",
+  body: params
+});
+
+// 🔁 RECHARGER DEPUIS SHEETS (INDISPENSABLE)
+await loadTreesFromSheets();
+
+const refreshed = trees.find(t => t.id === treeObj.id);
+if (refreshed) {
+  treeObj.photos = refreshed.photos; // juste pour l’UI courante
+}
+
+
+    
 
   } catch (e) {
     console.warn("Sync Google Sheets échouée", e);
   }
 }
+
+
 
   // =========================
   // ICONS / COLORS
@@ -314,7 +327,7 @@ small{color:#9db0ff}
 </head>
 <body>
 <div class="card">
-  ${t.photos?.length ? `<img src="${t.photos[0].dataUrl}">` : ""}
+ ${t.photos?.length ? `<img src="${t.photos[0].driveUrl || t.photos[0].dataUrl}">` : ""}
   <h1>Fiche de l’arbre</h1>
   <p><b>ID :</b> ${escapeHtml(t.id)}</p>
   <p><b>Espèce :</b> ${escapeHtml(t.species || "—")}</p>
@@ -351,7 +364,8 @@ small{color:#9db0ff}
       wrap.className = "photo";
 
       const img = document.createElement("img");
-      img.src = p.dataUrl;
+      img.src = p.driveUrl || p.dataUrl;
+
       img.alt = p.name || `Photo ${idx + 1}`;
 
       const meta = document.createElement("div");
@@ -440,22 +454,16 @@ async function readFilesAsDataUrls(files) {
 
   for (const f of files) {
     const stampedDataUrl = await stampPhotoWithMeta(f, lat, lng);
-
-    out.push({
-      id: crypto.randomUUID(), // ✅ CRITIQUE
-      name: f.name,
-      type: f.type,
-      size: f.size,
-      addedAt: Date.now(),
-      dataUrl: stampedDataUrl,
-    });
-    out.push({
+out.push({
   id: crypto.randomUUID(),
   name: f.name,
+  type: f.type,
+  size: f.size,
   addedAt: Date.now(),
   dataUrl: stampedDataUrl,
-  synced: false   // 👈 CRITIQUE
+  
 });
+
 
   }
 
@@ -463,26 +471,7 @@ async function readFilesAsDataUrls(files) {
 }
 
 
-async function refreshFromSheets() {
-  try {
-    const res = await fetch(API_URL);
-    if (!res.ok) throw new Error("Sheets indisponible");
 
-    const data = await res.json();
-    if (!Array.isArray(data)) return;
-
-    trees = data;
-    saveTreesLocal();
-
-    renderMarkers();
-    renderList();
-    renderSecteurCount();
-
-    console.log("🔄 Données synchronisées depuis Sheets");
-  } catch (e) {
-    console.warn("Sync Sheets échouée", e);
-  }
-}
 
   // =========================
   // LIST
@@ -1128,12 +1117,7 @@ if (undoBtn) {
       }
 
       const quartier = getQuartierFromLatLng(lat, lng);
-const photos = pendingPhotos.map(p => ({
-  id: p.id,
-  name: p.name,
-  addedAt: p.addedAt,
-  dataUrl: p.dataUrl
-}));
+
 
 
 
@@ -1159,10 +1143,12 @@ if (selectedId) {
 
   t.updatedAt = Date.now();
 
-  saveTreesLocal();        // 💾 local OK
-  await syncToSheets(t);  // ☁️ Sheets (métadonnées seulement)
 
-  persistAndRefresh(t.id); // 🔁 UI + carte + liste
+
+await syncToSheets(t);     // ☁️ Sheets + Drive
+persistAndRefresh(t.id);  // 💾 local + UI
+
+
 
   cameraInput.value = "";
   galleryInput.value = "";
@@ -1173,28 +1159,30 @@ if (selectedId) {
 }
 
 
-      // create
-      const t = {
-        id: uid(),
-        lat,
-        lng,
-        quartier,
-        species: speciesEl().value.trim(),
-        height: heightEl().value === "" ? null : Number(heightEl().value),
-        dbh: dbhEl().value === "" ? null : Number(dbhEl().value),
-        secteur: secteurEl().value,
-        address: addressEl().value.trim(),
-        tags: normalizeTags(tagsEl().value),
-        comment: commentEl().value.trim(),
-        photos,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      };
+   const t = {
+  id: uid(),
+  lat,
+  lng,
+  quartier,
+  species: speciesEl().value.trim(),
+  height: heightEl().value === "" ? null : Number(heightEl().value),
+  dbh: dbhEl().value === "" ? null : Number(dbhEl().value),
+  secteur: secteurEl().value,
+  address: addressEl().value.trim(),
+  tags: normalizeTags(tagsEl().value),
+  comment: commentEl().value.trim(),
 
-      await syncToSheets(t);
+  photos: pendingPhotos,   // ✅ ICI ET UNIQUEMENT ICI
 
-      trees.unshift(t);
-      persistAndRefresh(t.id);
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
+};
+
+
+    await syncToSheets(t);
+const exists = trees.find(x => x.id === t.id);
+persistAndRefresh(exists?.id || t.id);
+
 pendingPhotos = [];
 
       treeIdEl().value = t.id;
@@ -1247,35 +1235,31 @@ applyAgentMode();
   // =========================
   // START
   // =========================
-  document.addEventListener("DOMContentLoaded", async () => {
-    // si Leaflet pas chargé => stop clair
-    if (typeof L === "undefined") {
-      console.error("Leaflet (L) n'est pas chargé.");
-      alert("Leaflet ne s'est pas chargé. Vérifie la connexion / scripts.");
-      return;
-    }
+ document.addEventListener("DOMContentLoaded", async () => {
+  if (typeof L === "undefined") {
+    console.error("Leaflet (L) n'est pas chargé.");
+    alert("Leaflet ne s'est pas chargé.");
+    return;
+  }
 
-    // charge stockage
-    await loadTreesFromSheets();
+  // 📥 CHARGEMENT INITIAL
+  await loadTreesFromSheets();
 
+  initMap();
+  addLegendToMap();
+  wireUI();
 
-    // init
-    initMap();
-    addLegendToMap();
-    wireUI();
+  await loadQuartiersGeoJSON();
+  await loadCityContourAndLock();
 
-    // layers
-    await loadQuartiersGeoJSON();
-    await loadCityContourAndLock();
+  renderMarkers();
+  renderList();
+  renderSecteurCount();
+  setSelected(null);
 
-    // render
-    renderMarkers();
-    renderList();
-    renderSecteurCount();
-    setSelected(null);
+  console.log("✅ App chargée.");
+});
 
-    console.log("✅ App chargée (A+B+C+D).");
-  });
 
   let carouselIndex = 0;
 let carouselPhotos = [];
@@ -1322,49 +1306,12 @@ function updateCarousel() {
   const img = document.getElementById("carouselImage");
   const count = document.getElementById("carouselCount");
 
-  img.src = carouselPhotos[carouselIndex].dataUrl;
+ img.src = carouselPhotos[carouselIndex].driveUrl 
+       || carouselPhotos[carouselIndex].dataUrl;
+
   count.textContent = `${carouselIndex + 1} / ${carouselPhotos.length}`;
 }
 
-async function syncPhotosToDrive() {
-  if (!selectedId) return;
 
-  const t = getTreeById(selectedId);
-  if (!t || !t.photos?.length) return;
-
-  const unsynced = t.photos.filter(p => !p.synced);
-  if (unsynced.length === 0) {
-    alert("Toutes les photos sont déjà synchronisées.");
-    return;
-  }
-
-  for (const p of unsynced) {
-    try {
-      const params = new URLSearchParams();
-      params.append("action", "uploadPhoto");
-      params.append("id", t.id);
-      params.append("name", p.name);
-      params.append("dataUrl", p.dataUrl);
-
-      const res = await fetch(API_URL, {
-        method: "POST",
-        body: params
-      });
-
-      if (res.ok) {
-        p.synced = true; // ✅ marquée comme synchronisée
-      }
-    } catch (e) {
-      console.warn("Sync photo échouée", e);
-      break;
-    }
-  }
-
-  saveTreesLocal();
-  persistAndRefresh(t.id);
-
-  alert("Synchronisation Drive terminée.");
-}
-document.getElementById("syncPhotosBtn").onclick = syncPhotosToDrive;
 
 })();
