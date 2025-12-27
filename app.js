@@ -117,34 +117,23 @@
     if (focusId) setSelected(focusId);
   }
 
- async function syncToSheets(treeObj) {
+  // =========================
+  // GOOGLE SHEETS SYNC
+  // =========================
+async function syncToSheets(treeObj) {
   try {
     const params = new URLSearchParams();
 
     for (const key in treeObj) {
-      const value = treeObj[key];
+      let value = treeObj[key];
 
-      // ✅ CAS SPÉCIAL PHOTOS
       if (key === "photos") {
-        const newPhotos = (treeObj.photos || []).filter(
-          p => p.dataUrl && p.dataUrl.startsWith("data:")
-        );
-
-        // 👉 on envoie SEULEMENT s’il y a des photos
-        if (newPhotos.length > 0) {
-          params.append("photos", JSON.stringify(newPhotos));
-        }
-
-        continue; // ⛔ CRITIQUE : ne pas retomber dans le append générique
+        // 🔥 FIX IMPORTANT
+        value = JSON.stringify(treeObj.photos || []);
+      } else if (Array.isArray(value)) {
+        value = value.join(",");
       }
 
-      // tableaux simples
-      if (Array.isArray(value)) {
-        params.append(key, value.join(","));
-        continue;
-      }
-
-      // valeurs simples
       params.append(key, value ?? "");
     }
 
@@ -157,6 +146,24 @@
     console.warn("Sync Google Sheets échouée", e);
   }
 }
+
+
+async function deleteFromSheets(id) {
+  try {
+    const params = new URLSearchParams();
+    params.append("action", "delete");
+    params.append("id", id);
+
+    await fetch(API_URL, {
+      method: "POST",
+      body: params
+    });
+
+  } catch (e) {
+    console.warn("Suppression Google Sheets échouée", e);
+  }
+}
+
 
   // =========================
   // ICONS / COLORS
@@ -455,26 +462,6 @@ async function readFilesAsDataUrls(files) {
 }
 
 
-async function refreshFromSheets() {
-  try {
-    const res = await fetch(API_URL);
-    if (!res.ok) throw new Error("Sheets indisponible");
-
-    const data = await res.json();
-    if (!Array.isArray(data)) return;
-
-    trees = data;
-    saveTreesLocal();
-
-    renderMarkers();
-    renderList();
-    renderSecteurCount();
-
-    console.log("🔄 Données synchronisées depuis Sheets");
-  } catch (e) {
-    console.warn("Sync Sheets échouée", e);
-  }
-}
 
   // =========================
   // LIST
@@ -650,7 +637,7 @@ document.getElementById("photoCarousel")?.classList.add("hidden");
 
 
   function setSelected(id) {
-    
+    pendingPhotos = []; // 🔥 CRITIQUE : reset état temporaire
 
     selectedId = id;
     const t = id ? getTreeById(id) : null;
@@ -1140,13 +1127,8 @@ const photos = pendingPhotos.map(p => ({
         t.photos = [...(t.photos || []), ...photos];
 
         await syncToSheets(t);
-        await loadTreesFromSheets();
-persistAndRefresh(t.id);
-
-await refreshFromSheets();
 
         persistAndRefresh(t.id);
-        pendingPhotos = [];
         cameraInput.value = "";
         galleryInput.value = "";
         photoStatus.textContent = "";
@@ -1176,7 +1158,6 @@ await refreshFromSheets();
 
       trees.unshift(t);
       persistAndRefresh(t.id);
-pendingPhotos = [];
 
       treeIdEl().value = t.id;
       cameraInput.value = "";
@@ -1187,10 +1168,8 @@ pendingPhotos = [];
   }
 async function loadTreesFromSheets() {
   try {
-    const url = API_URL + "?_=" + Date.now(); // ✅ anti-cache
-    const res = await fetch(url, { cache: "no-store" }); // ✅ anti-cache navigateur
-
-    if (!res.ok) throw new Error("Sheets indisponible: " + res.status);
+    const res = await fetch(API_URL);
+    if (!res.ok) throw new Error("Sheets indisponible");
 
     const data = await res.json();
     if (!Array.isArray(data)) throw new Error("Format Sheets invalide");
@@ -1199,12 +1178,13 @@ async function loadTreesFromSheets() {
     saveTreesLocal();
 
     console.log("📥 Données chargées depuis Google Sheets :", trees.length);
-  } catch (e) {
-    console.warn("⚠️ Impossible de charger depuis Sheets, fallback local", e);
-    trees = loadTrees(); // localStorage
-  }
+  } 
+  catch (e) {
+  console.warn("⚠️ Impossible de charger depuis Sheets, fallback local", e);
+  trees = loadTrees(); // localStorage
 }
 
+}
 let isAgentMode = localStorage.getItem("agentMode") === "true";
 
 function applyAgentMode() {
