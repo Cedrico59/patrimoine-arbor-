@@ -125,17 +125,23 @@ async function syncToSheets(treeObj) {
       const value = treeObj[key];
 
       // 📸 PHOTOS : on n’envoie QUE les nouvelles (dataUrl)
-      if (key === "photos") {
-        const newPhotos = (treeObj.photos || []).filter(
-          p => p.dataUrl && p.dataUrl.startsWith("data:")
-        );
+     if (key === "photos") {
+  const newPhotos = (treeObj.photos || []).filter(
+    p => p.dataUrl && p.dataUrl.startsWith("data:")
+  );
 
-        if (newPhotos.length > 0) {
-          params.append("photos", JSON.stringify(newPhotos));
-        }
+  if (newPhotos.length > 0) {
+    params.append("photos", JSON.stringify(newPhotos));
+  }
 
-        continue; // ⛔ très important
-      }
+  continue;
+}
+// 📸 ENVOI DES PHOTOS TEMPORAIRES (SEULE SOURCE FIABLE)
+if (pendingPhotos && pendingPhotos.length > 0) {
+  params.append("photos", JSON.stringify(pendingPhotos));
+}
+console.log("📤 Photos envoyées :", pendingPhotos.length);
+
 
       // tableaux simples
       if (Array.isArray(value)) {
@@ -152,6 +158,8 @@ async function syncToSheets(treeObj) {
   method: "POST",
   body: params
 });
+pendingPhotos = []; // 🔥 très important
+
 
 // 🔁 RECHARGER DEPUIS SHEETS (INDISPENSABLE)
 await loadTreesFromSheets();
@@ -648,7 +656,7 @@ document.getElementById("photoCarousel")?.classList.add("hidden");
 
   function setSelected(id) {
     
-pendingPhotos = [];
+
 
     selectedId = id;
     const t = id ? getTreeById(id) : null;
@@ -1034,7 +1042,7 @@ if (toggleListBtn && treeListWrapper) {
     };
 
     newBtn().onclick = () => {
-    pendingPhotos = []; // 🔥 reset photos temporaires
+   
 
       selectedId = null;
       deleteBtn().disabled = true;
@@ -1145,7 +1153,7 @@ if (selectedId) {
 
   // 🔥 photos : fusion définitive
   t.photos = [...(t.photos || []), ...pendingPhotos];
-  pendingPhotos = [];
+  
 
   t.updatedAt = Date.now();
 
