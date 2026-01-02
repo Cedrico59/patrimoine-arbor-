@@ -4,7 +4,7 @@
   // =========================
   // CONFIG
   // =========================
-  const API_URL = "https://script.google.com/macros/s/AKfycbxW_WIAZ4cBnk0ND3-0PoYcce5C52eAE-Sc-RtfWq6ceXqbWgwlekIHUfws3dXxzpGm/exec";
+  const API_URL = "https://script.google.com/macros/s/AKfycbyKDeWt4eJroi4MLSlBn1I0WAouTR1g6sqv5_O1BJ-6YSXiuAY_qubgs3JNGzFo_iG0/exec";
   const STORAGE_KEY = "marcq_arbres_v1";
   const MARCQ_CENTER = [50.676, 3.086];
 
@@ -117,52 +117,84 @@
     if (focusId) setSelected(focusId);
   }
 
-  // =========================
-  // GOOGLE SHEETS SYNC
-  // =========================
+ // =========================
+// GOOGLE SHEETS SYNC (JSON + Drive)
+// =========================
+
+/**
+ * Envoie un arbre (avec photos en dataUrl) vers Apps Script.
+ * Apps Script :
+ *  - upload les photos dans Drive
+ *  - stocke uniquement les URL Drive dans Sheets
+ *  - renvoie { ok:true, status, uploaded }
+ */
 async function syncToSheets(treeObj) {
   try {
-    const params = new URLSearchParams();
+    const payload = {
+      ...treeObj,
+      photos: treeObj.photos || []
+    };
 
-    for (const key in treeObj) {
-      let value = treeObj[key];
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
 
-      if (key === "photos") {
-        // 🔥 FIX IMPORTANT
-        value = JSON.stringify(treeObj.photos || []);
-      } else if (Array.isArray(value)) {
-        value = value.join(",");
-      }
-
-      params.append(key, value ?? "");
+    if (!res.ok) {
+      throw new Error("Réponse HTTP invalide : " + res.status);
     }
 
-    await fetch(API_URL, {
-      method: "POST",
-      body: params
-    });
+    const out = await res.json();
+
+    if (!out.ok) {
+      console.error("❌ Erreur Apps Script", out);
+      alert("Erreur upload vers Google Drive / Sheets");
+      return null;
+    }
+
+    return out;
 
   } catch (e) {
-    console.warn("Sync Google Sheets échouée", e);
+    console.error("❌ syncToSheets échoué", e);
+    alert("Impossible de synchroniser avec Google Sheets");
+    return null;
   }
 }
 
 
+/**
+ * Suppression d’un arbre dans Google Sheets (et Drive côté serveur)
+ */
 async function deleteFromSheets(id) {
   try {
-    const params = new URLSearchParams();
-    params.append("action", "delete");
-    params.append("id", id);
-
-    await fetch(API_URL, {
+    const res = await fetch(API_URL, {
       method: "POST",
-      body: params
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        action: "delete",
+        id
+      })
     });
 
+    if (!res.ok) {
+      throw new Error("Réponse HTTP invalide : " + res.status);
+    }
+
+    const out = await res.text();
+    return out;
+
   } catch (e) {
-    console.warn("Suppression Google Sheets échouée", e);
+    console.error("❌ deleteFromSheets échoué", e);
+    alert("Impossible de supprimer dans Google Sheets");
+    return null;
   }
 }
+
 
 
   // =========================
@@ -358,7 +390,7 @@ small{color:#9db0ff}
       wrap.className = "photo";
 
       const img = document.createElement("img");
-      img.src = p.dataUrl;
+      img.src = p.url || p.dataUrl;
       img.alt = p.name || `Photo ${idx + 1}`;
 
       const meta = document.createElement("div");
@@ -1128,7 +1160,10 @@ const photos = pendingPhotos.map(p => ({
 
         await syncToSheets(t);
 
-        persistAndRefresh(t.id);
+// 🔁 Drive + Sheets = vérité terrain
+await loadTreesFromSheets();
+persistAndRefresh(t.id);
+
         cameraInput.value = "";
         galleryInput.value = "";
         photoStatus.textContent = "";
@@ -1154,10 +1189,12 @@ const photos = pendingPhotos.map(p => ({
         updatedAt: Date.now(),
       };
 
-      await syncToSheets(t);
+    await syncToSheets(t);
 
-      trees.unshift(t);
-      persistAndRefresh(t.id);
+// 🔁 source unique = Sheets
+await loadTreesFromSheets();
+persistAndRefresh(t.id);
+
 
       treeIdEl().value = t.id;
       cameraInput.value = "";
@@ -1289,3 +1326,4 @@ function updateCarousel() {
 
 
 })();
+
