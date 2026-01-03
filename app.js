@@ -339,7 +339,8 @@ small{color:#9db0ff}
       wrap.className = "photo";
 
       const img = document.createElement("img");
-     img.src = p.dataUrl || p.url;
+     img.src = getPhotoSrc(p);
+
       img.alt = p.name || `Photo ${idx + 1}`;
 
       const meta = document.createElement("div");
@@ -1304,9 +1305,28 @@ function updateCarousel() {
   const img = document.getElementById("carouselImage");
   const count = document.getElementById("carouselCount");
 
-  img.src = carouselPhotos[carouselIndex].dataUrl || carouselPhotos[carouselIndex].url;
+  const p = carouselPhotos[carouselIndex];
+  img.src = getPhotoSrc(p);
+
   count.textContent = `${carouselIndex + 1} / ${carouselPhotos.length}`;
 }
 
 
+
 })();
+function getPhotoSrc(p) {
+  if (p.dataUrl) return p.dataUrl;
+
+  if (p.url) {
+    // convertit lien Drive "view" → lien direct
+    if (p.url.includes("drive.google.com")) {
+      const m = p.url.match(/\/d\/([^/]+)/);
+      if (m && m[1]) {
+        return `https://drive.google.com/uc?export=view&id=${m[1]}`;
+      }
+    }
+    return p.url;
+  }
+
+  return "";
+}
