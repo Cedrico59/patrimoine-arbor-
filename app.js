@@ -327,6 +327,24 @@ small{color:#9db0ff}
   // =========================
   // GALLERY
   // =========================
+function getPhotoSrc(p) {
+  if (p.dataUrl) return p.dataUrl;
+
+  if (p.url) {
+    // convertit lien Drive "view" → lien direct
+    if (p.url.includes("drive.google.com")) {
+      const m = p.url.match(/\/d\/([^/]+)/);
+      if (m && m[1]) {
+        return `https://drive.google.com/uc?export=view&id=${m[1]}`;
+      }
+    }
+    return p.url;
+  }
+
+  return "";
+}
+
+  
   function renderGallery(photos) {
     const g = galleryEl();
     if (!g) return;
@@ -1314,19 +1332,3 @@ function updateCarousel() {
 
 
 })();
-function getPhotoSrc(p) {
-  if (p.dataUrl) return p.dataUrl;
-
-  if (p.url) {
-    // convertit lien Drive "view" → lien direct
-    if (p.url.includes("drive.google.com")) {
-      const m = p.url.match(/\/d\/([^/]+)/);
-      if (m && m[1]) {
-        return `https://drive.google.com/uc?export=view&id=${m[1]}`;
-      }
-    }
-    return p.url;
-  }
-
-  return "";
-}
