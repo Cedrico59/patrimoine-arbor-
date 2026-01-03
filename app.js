@@ -354,17 +354,17 @@ function getPhotoSrc(p) {
   }
 
   // 2️⃣ Photo Drive (ID direct = TOP)
-  if (p.driveId) {
-    return `https://drive.google.com/uc?export=view&id=${p.driveId}`;
-  }
+if (p.driveId) {
+  return `https://drive.google.com/thumbnail?id=${p.driveId}&sz=w1200`;
+}
+
 
   // 3️⃣ Fallback : URL Drive à parser
   if (p.url) {
     // /file/d/XXXX/view
     let m = p.url.match(/\/d\/([a-zA-Z0-9_-]{10,})/);
-    if (m && m[1]) {
-      return `https://drive.google.com/uc?export=view&id=${m[1]}`;
-    }
+    if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w1200`;
+
 
     // ?id=XXXX
     m = p.url.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
@@ -1105,14 +1105,19 @@ if (toggleListBtn && treeListWrapper) {
   lastDeletedTree = { ...t };
 
   // 🔗 suppression Google Sheets
-  try {
-    const params = new URLSearchParams();
-    params.append("action", "delete");
-    params.append("id", t.id);
-    await fetch(API_URL, { method: "POST", body: params });
-  } catch (e) {
-    console.warn("Suppression Google Sheets échouée", e);
-  }
+ try {
+  const body = new URLSearchParams();
+  body.append("payload", JSON.stringify({ action: "delete", id: t.id }));
+
+  await fetch(API_URL, {
+    method: "POST",
+    mode: "no-cors",
+    body
+  });
+} catch (e) {
+  console.warn("Suppression Google Sheets échouée", e);
+}
+
 
   // 🗑️ suppression locale
   trees = trees.filter(x => x.id !== t.id);
