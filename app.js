@@ -302,7 +302,7 @@ small{color:#9db0ff}
 </head>
 <body>
 <div class="card">
-  ${t.photos?.length ? `<img src="${t.photos[0].dataUrl || t.photos[0].url}">` : ""}
+  ${t.photos?.length ? `<img src="${getPhotoSrc(t.photos[0])}">` : ""}
   <h1>Fiche de l’arbre</h1>
   <p><b>ID :</b> ${escapeHtml(t.id)}</p>
   <p><b>Espèce :</b> ${escapeHtml(t.species || "—")}</p>
