@@ -117,29 +117,28 @@
     if (focusId) setSelected(focusId);
   }
 
- async function syncToSheets(treeObj) {
+async function syncToSheets(treeObj) {
   try {
     const payload = { ...treeObj };
 
-    // ✅ n’envoyer que les nouvelles photos (base64)
-    if (Array.isArray(treeObj.photos)) {
-      payload.photos = treeObj.photos.filter(
-        p => p.dataUrl && p.dataUrl.startsWith("data:")
-      );
-    }
+    // ✅ envoyer uniquement les nouvelles photos
+    payload.photos = (treeObj.photos || []).filter(
+      p => p.dataUrl && p.dataUrl.startsWith("data:")
+    );
 
-    await fetch(API_URL, {
+    const res = await fetch(API_URL, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload) // ⚠️ PAS de headers
     });
 
+    const txt = await res.text();
+    console.log("☁️ Sheets response:", txt);
+
   } catch (e) {
-    console.warn("Sync Google Sheets échouée", e);
+    console.error("❌ Sync Google Sheets échouée", e);
   }
 }
+
 
 
   // =========================
