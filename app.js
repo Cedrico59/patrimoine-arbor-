@@ -327,22 +327,58 @@ small{color:#9db0ff}
   // =========================
   // GALLERY
   // =========================
-function getPhotoSrc(p) {
-  if (p.dataUrl) return p.dataUrl;
+function getDriveIdFromUrl(url) {
+  if (!url) return null;
 
+  // /file/d/<id>/view
+  let m = url.match(/\/d\/([a-zA-Z0-9_-]{10,})/);
+  if (m && m[1]) return m[1];
+
+  // ?id=<id>
+  m = url.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
+  if (m && m[1]) return m[1];
+
+  // open?id=<id>
+  m = url.match(/open\?id=([a-zA-Z0-9_-]{10,})/);
+  if (m && m[1]) return m[1];
+
+  return null;
+}
+
+function getPhotoSrc(p) {
+  if (!p) return "";
+
+  // 1️⃣ Photo fraîche (base64)
+  if (p.dataUrl && p.dataUrl.startsWith("data:")) {
+    return p.dataUrl;
+  }
+
+  // 2️⃣ Photo Drive (ID direct = TOP)
+  if (p.driveId) {
+    return `https://drive.google.com/uc?export=view&id=${p.driveId}`;
+  }
+
+  // 3️⃣ Fallback : URL Drive à parser
   if (p.url) {
-    // convertit lien Drive "view" → lien direct
-    if (p.url.includes("drive.google.com")) {
-      const m = p.url.match(/\/d\/([^/]+)/);
-      if (m && m[1]) {
-        return `https://drive.google.com/uc?export=view&id=${m[1]}`;
-      }
+    // /file/d/XXXX/view
+    let m = p.url.match(/\/d\/([a-zA-Z0-9_-]{10,})/);
+    if (m && m[1]) {
+      return `https://drive.google.com/uc?export=view&id=${m[1]}`;
     }
+
+    // ?id=XXXX
+    m = p.url.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
+    if (m && m[1]) {
+      return `https://drive.google.com/uc?export=view&id=${m[1]}`;
+    }
+
     return p.url;
   }
 
   return "";
 }
+
+
 
   
   function renderGallery(photos) {
