@@ -4,7 +4,7 @@
   // =========================
   // CONFIG
   // =========================
-  const API_URL = "https://script.google.com/macros/s/AKfycbyKDeWt4eJroi4MLSlBn1I0WAouTR1g6sqv5_O1BJ-6YSXiuAY_qubgs3JNGzFo_iG0/exec";
+  const API_URL = "https://script.google.com/macros/s/AKfycbweINPOfMrI83A2tcUSMiRPdNl92Y-JxPWcnZ7hAK-p_IItZSzCqFQuZmytyoEDVazr/exec";
   const STORAGE_KEY = "marcq_arbres_v1";
   const MARCQ_CENTER = [50.676, 3.086];
 
@@ -117,25 +117,18 @@
     if (focusId) setSelected(focusId);
   }
 
- // =========================
-// GOOGLE SHEETS SYNC (JSON + Drive)
-// =========================
-
-/**
- * Envoie un arbre (avec photos en dataUrl) vers Apps Script.
- * Apps Script :
- *  - upload les photos dans Drive
- *  - stocke uniquement les URL Drive dans Sheets
- *  - renvoie { ok:true, status, uploaded }
- */
-async function syncToSheets(treeObj) {
+ async function syncToSheets(treeObj) {
   try {
-    const payload = {
-      ...treeObj,
-      photos: treeObj.photos || []
-    };
+    const payload = { ...treeObj };
 
-    const res = await fetch(API_URL, {
+    // ✅ n’envoyer que les nouvelles photos (base64)
+    if (Array.isArray(treeObj.photos)) {
+      payload.photos = treeObj.photos.filter(
+        p => p.dataUrl && p.dataUrl.startsWith("data:")
+      );
+    }
+
+    await fetch(API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -143,58 +136,10 @@ async function syncToSheets(treeObj) {
       body: JSON.stringify(payload)
     });
 
-    if (!res.ok) {
-      throw new Error("Réponse HTTP invalide : " + res.status);
-    }
-
-    const out = await res.json();
-
-    if (!out.ok) {
-      console.error("❌ Erreur Apps Script", out);
-      alert("Erreur upload vers Google Drive / Sheets");
-      return null;
-    }
-
-    return out;
-
   } catch (e) {
-    console.error("❌ syncToSheets échoué", e);
-    alert("Impossible de synchroniser avec Google Sheets");
-    return null;
+    console.warn("Sync Google Sheets échouée", e);
   }
 }
-
-
-/**
- * Suppression d’un arbre dans Google Sheets (et Drive côté serveur)
- */
-async function deleteFromSheets(id) {
-  try {
-    const res = await fetch(API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        action: "delete",
-        id
-      })
-    });
-
-    if (!res.ok) {
-      throw new Error("Réponse HTTP invalide : " + res.status);
-    }
-
-    const out = await res.text();
-    return out;
-
-  } catch (e) {
-    console.error("❌ deleteFromSheets échoué", e);
-    alert("Impossible de supprimer dans Google Sheets");
-    return null;
-  }
-}
-
 
 
   // =========================
@@ -353,7 +298,7 @@ small{color:#9db0ff}
 </head>
 <body>
 <div class="card">
-  ${t.photos?.length ? `<img src="${t.photos[0].dataUrl}">` : ""}
+  ${t.photos?.length ? `<img src="${t.photos[0].dataUrl || t.photos[0].url}">` : ""}
   <h1>Fiche de l’arbre</h1>
   <p><b>ID :</b> ${escapeHtml(t.id)}</p>
   <p><b>Espèce :</b> ${escapeHtml(t.species || "—")}</p>
@@ -390,7 +335,7 @@ small{color:#9db0ff}
       wrap.className = "photo";
 
       const img = document.createElement("img");
-      img.src = p.url || p.dataUrl;
+     img.src = p.dataUrl || p.url;
       img.alt = p.name || `Photo ${idx + 1}`;
 
       const meta = document.createElement("div");
@@ -407,7 +352,9 @@ small{color:#9db0ff}
         if (!selectedId) return;
         const t = getTreeById(selectedId);
         if (!t) return;
-        t.photos = (t.photos || []).filter(p => p.id !== photos[idx].id);
+        t.photos = t.photos.filter(p =>
+  !(p.url === photos[idx].url && p.addedAt === photos[idx].addedAt)
+);
 
         t.updatedAt = Date.now();
         persistAndRefresh(t.id);
@@ -461,7 +408,7 @@ async function stampPhotoWithMeta(file, lat, lng) {
       ctx.fillText(dateStr, padding, canvas.height - 40);
       ctx.fillText(coordStr, padding, canvas.height - 10);
 
-      resolve(canvas.toDataURL("image/jpeg", 0.7));
+      resolve(canvas.toDataURL("image/jpeg", 0.6));
     };
 
     img.onerror = reject;
@@ -494,6 +441,26 @@ async function readFilesAsDataUrls(files) {
 }
 
 
+async function refreshFromSheets() {
+  try {
+    const res = await fetch(API_URL);
+    if (!res.ok) throw new Error("Sheets indisponible");
+
+    const data = await res.json();
+    if (!Array.isArray(data)) return;
+
+    trees = data;
+    saveTreesLocal();
+
+    renderMarkers();
+    renderList();
+    renderSecteurCount();
+
+    console.log("🔄 Données synchronisées depuis Sheets");
+  } catch (e) {
+    console.warn("Sync Sheets échouée", e);
+  }
+}
 
   // =========================
   // LIST
@@ -669,7 +636,8 @@ document.getElementById("photoCarousel")?.classList.add("hidden");
 
 
   function setSelected(id) {
-    pendingPhotos = []; // 🔥 CRITIQUE : reset état temporaire
+    
+pendingPhotos = [];
 
     selectedId = id;
     const t = id ? getTreeById(id) : null;
@@ -950,8 +918,15 @@ cameraInput.addEventListener("change", async () => {
   cameraInput.value = "";
 
   updatePhotoStatus();
-  renderGallery(pendingPhotos);
-  renderPhotoCarousel(pendingPhotos); // ✅ AJOUT
+  const t = selectedId ? getTreeById(selectedId) : null;
+const allPhotos = [
+  ...(t?.photos || []),
+  ...pendingPhotos
+];
+
+renderGallery(allPhotos);
+renderPhotoCarousel(allPhotos);
+
 });
 
 
@@ -1140,36 +1115,41 @@ const photos = pendingPhotos.map(p => ({
 
 
 
-      if (selectedId) {
-        // update
-        const t = getTreeById(selectedId);
-        if (!t) return;
+if (selectedId) {
+  // update
+  const t = getTreeById(selectedId);
+  if (!t) return;
 
-        t.lat = lat;
-        t.lng = lng;
-        t.quartier = quartier;
-        t.species = speciesEl().value.trim();
-        t.height = heightEl().value === "" ? null : Number(heightEl().value);
-        t.dbh = dbhEl().value === "" ? null : Number(dbhEl().value);
-        t.secteur = secteurEl().value;
-        t.address = addressEl().value.trim();
-        t.tags = normalizeTags(tagsEl().value);
-        t.comment = commentEl().value.trim();
-        t.updatedAt = Date.now();
-        t.photos = [...(t.photos || []), ...photos];
+  t.lat = lat;
+  t.lng = lng;
+  t.quartier = quartier;
+  t.species = speciesEl().value.trim();
+  t.height = heightEl().value === "" ? null : Number(heightEl().value);
+  t.dbh = dbhEl().value === "" ? null : Number(dbhEl().value);
+  t.secteur = secteurEl().value;
+  t.address = addressEl().value.trim();
+  t.tags = normalizeTags(tagsEl().value);
+  t.comment = commentEl().value.trim();
 
-        await syncToSheets(t);
+  // 🔥 photos : fusion définitive
+  t.photos = [...(t.photos || []), ...pendingPhotos];
+  pendingPhotos = [];
 
-// 🔁 Drive + Sheets = vérité terrain
-await loadTreesFromSheets();
-persistAndRefresh(t.id);
+  t.updatedAt = Date.now();
 
-        cameraInput.value = "";
-        galleryInput.value = "";
-        photoStatus.textContent = "";
-        alert("Arbre mis à jour.");
-        return;
-      }
+  saveTreesLocal();        // 💾 local OK
+  await syncToSheets(t);  // ☁️ Sheets (métadonnées seulement)
+
+  persistAndRefresh(t.id); // 🔁 UI + carte + liste
+
+  cameraInput.value = "";
+  galleryInput.value = "";
+  photoStatus.textContent = "";
+
+  alert("Arbre mis à jour.");
+  return;
+}
+
 
       // create
       const t = {
@@ -1189,12 +1169,11 @@ persistAndRefresh(t.id);
         updatedAt: Date.now(),
       };
 
-    await syncToSheets(t);
+      await syncToSheets(t);
 
-// 🔁 source unique = Sheets
-await loadTreesFromSheets();
-persistAndRefresh(t.id);
-
+      trees.unshift(t);
+      persistAndRefresh(t.id);
+pendingPhotos = [];
 
       treeIdEl().value = t.id;
       cameraInput.value = "";
@@ -1205,8 +1184,10 @@ persistAndRefresh(t.id);
   }
 async function loadTreesFromSheets() {
   try {
-    const res = await fetch(API_URL);
-    if (!res.ok) throw new Error("Sheets indisponible");
+    const url = API_URL + "?_=" + Date.now(); // ✅ anti-cache
+    const res = await fetch(url, { cache: "no-store" }); // ✅ anti-cache navigateur
+
+    if (!res.ok) throw new Error("Sheets indisponible: " + res.status);
 
     const data = await res.json();
     if (!Array.isArray(data)) throw new Error("Format Sheets invalide");
@@ -1215,13 +1196,12 @@ async function loadTreesFromSheets() {
     saveTreesLocal();
 
     console.log("📥 Données chargées depuis Google Sheets :", trees.length);
-  } 
-  catch (e) {
-  console.warn("⚠️ Impossible de charger depuis Sheets, fallback local", e);
-  trees = loadTrees(); // localStorage
+  } catch (e) {
+    console.warn("⚠️ Impossible de charger depuis Sheets, fallback local", e);
+    trees = loadTrees(); // localStorage
+  }
 }
 
-}
 let isAgentMode = localStorage.getItem("agentMode") === "true";
 
 function applyAgentMode() {
@@ -1320,10 +1300,9 @@ function updateCarousel() {
   const img = document.getElementById("carouselImage");
   const count = document.getElementById("carouselCount");
 
-  img.src = carouselPhotos[carouselIndex].dataUrl;
+  img.src = carouselPhotos[carouselIndex].dataUrl || carouselPhotos[carouselIndex].url;
   count.textContent = `${carouselIndex + 1} / ${carouselPhotos.length}`;
 }
 
 
 })();
-
