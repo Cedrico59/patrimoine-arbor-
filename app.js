@@ -121,23 +121,28 @@ async function syncToSheets(treeObj) {
   try {
     const payload = { ...treeObj };
 
-    // ✅ envoyer uniquement les nouvelles photos
+    // ✅ n'envoyer que les nouvelles photos (base64)
     payload.photos = (treeObj.photos || []).filter(
       p => p.dataUrl && p.dataUrl.startsWith("data:")
     );
 
-    const res = await fetch(API_URL, {
+    const body = new URLSearchParams();
+    body.append("payload", JSON.stringify(payload));
+
+    await fetch(API_URL, {
       method: "POST",
-      body: JSON.stringify(payload) // ⚠️ PAS de headers
+      mode: "no-cors",
+      body
     });
 
-    const txt = await res.text();
-    console.log("☁️ Sheets response:", txt);
+    // ✅ ensuite on recharge depuis Sheets pour être sûr
+    await loadTreesFromSheets();
 
   } catch (e) {
     console.error("❌ Sync Google Sheets échouée", e);
   }
 }
+
 
 
 
