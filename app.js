@@ -5,8 +5,8 @@
   // CONFIG
   // =========================
   const API_URL = "https://script.google.com/macros/s/AKfycbweINPOfMrI83A2tcUSMiRPdNl92Y-JxPWcnZ7hAK-p_IItZSzCqFQuZmytyoEDVazr/exec";
+  const STORAGE_KEY = "marcq_arbres_v1";
   const MARCQ_CENTER = [50.676, 3.086];
-console.log("✅ APP.JS CHARGÉ");
 
   // Quartiers (coloring)
   const QUARTIER_COLORS = {
@@ -97,94 +97,52 @@ console.log("✅ APP.JS CHARGÉ");
     return trees.find((t) => t.id === id);
   }
 
- 
+  function loadTrees() {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    } catch {
+      return [];
+    }
+  }
 
+  function saveTreesLocal() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(trees));
+  }
 
-function persistAndRefresh(focusId = selectedId) {
-  renderMarkers();
-  renderList();
-  renderSecteurCount();
-  if (focusId) setSelected(focusId);
-}
+  function persistAndRefresh(focusId = selectedId) {
+    saveTreesLocal();
+    renderMarkers();
+    renderList();
+    renderSecteurCount();
+    if (focusId) setSelected(focusId);
+  }
 
-
- // =========================
-// GOOGLE SHEETS SYNC (JSON + Drive)
-// =========================
-
-/**
- * Envoie un arbre (avec photos en dataUrl) vers Apps Script.
- * Apps Script :
- *  - upload les photos dans Drive
- *  - stocke uniquement les URL Drive dans Sheets
- *  - renvoie { ok:true, status, uploaded }
- */
 async function syncToSheets(treeObj) {
   try {
-    const payload = {
-      ...treeObj,
-      photos: treeObj.photos || []
-    };
+    const payload = { ...treeObj };
 
-    const res = await fetch(API_URL, {
+    // ✅ n'envoyer que les nouvelles photos (base64)
+    payload.photos = (treeObj.photos || []).filter(
+      p => p.dataUrl && p.dataUrl.startsWith("data:")
+    );
+
+    const body = new URLSearchParams();
+    body.append("payload", JSON.stringify(payload));
+
+    await fetch(API_URL, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
+      mode: "no-cors",
+      body
     });
 
-    if (!res.ok) {
-      throw new Error("Réponse HTTP invalide : " + res.status);
-    }
-
-    const out = await res.json();
-
-    if (!out.ok) {
-      console.error("❌ Erreur Apps Script", out);
-      alert("Erreur upload vers Google Drive / Sheets");
-      return null;
-    }
-
-    return out;
+    // ✅ ensuite on recharge depuis Sheets pour être sûr
+    await loadTreesFromSheets();
 
   } catch (e) {
-    console.error("❌ syncToSheets échoué", e);
-    alert("Impossible de synchroniser avec Google Sheets");
-    return null;
+    console.error("❌ Sync Google Sheets échouée", e);
   }
 }
 
-
-/**
- * Suppression d’un arbre dans Google Sheets (et Drive côté serveur)
- */
-async function deleteFromSheets(id) {
-  try {
-    const res = await fetch(API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        action: "delete",
-        id
-      })
-    });
-
-    if (!res.ok) {
-      throw new Error("Réponse HTTP invalide : " + res.status);
-    }
-
-    const out = await res.text();
-    return out;
-
-  } catch (e) {
-    console.error("❌ deleteFromSheets échoué", e);
-    alert("Impossible de supprimer dans Google Sheets");
-    return null;
-  }
-}
 
 
 
@@ -344,7 +302,7 @@ small{color:#9db0ff}
 </head>
 <body>
 <div class="card">
-  ${t.photos?.length ? `<img src="${t.photos[0].dataUrl}">` : ""}
+  ${t.photos?.length ? `<img src="${getPhotoSrc(t.photos[0])}">` : ""}
   <h1>Fiche de l’arbre</h1>
   <p><b>ID :</b> ${escapeHtml(t.id)}</p>
   <p><b>Espèce :</b> ${escapeHtml(t.species || "—")}</p>
@@ -369,6 +327,60 @@ small{color:#9db0ff}
   // =========================
   // GALLERY
   // =========================
+function getDriveIdFromUrl(url) {
+  if (!url) return null;
+
+  // /file/d/<id>/view
+  let m = url.match(/\/d\/([a-zA-Z0-9_-]{10,})/);
+  if (m && m[1]) return m[1];
+
+  // ?id=<id>
+  m = url.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
+  if (m && m[1]) return m[1];
+
+  // open?id=<id>
+  m = url.match(/open\?id=([a-zA-Z0-9_-]{10,})/);
+  if (m && m[1]) return m[1];
+
+  return null;
+}
+
+function getPhotoSrc(p) {
+  if (!p) return "";
+
+  // 1️⃣ Photo fraîche (base64)
+  if (p.dataUrl && p.dataUrl.startsWith("data:")) {
+    return p.dataUrl;
+  }
+
+  // 2️⃣ Photo Drive (ID direct = TOP)
+if (p.driveId) {
+  return `https://drive.google.com/thumbnail?id=${p.driveId}&sz=w1200`;
+}
+
+
+  // 3️⃣ Fallback : URL Drive à parser
+  if (p.url) {
+    // /file/d/XXXX/view
+    let m = p.url.match(/\/d\/([a-zA-Z0-9_-]{10,})/);
+    if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w1200`;
+
+
+    // ?id=XXXX
+    m = p.url.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
+    if (m && m[1]) {
+      return `https://drive.google.com/uc?export=view&id=${m[1]}`;
+    }
+
+    return p.url;
+  }
+
+  return "";
+}
+
+
+
+  
   function renderGallery(photos) {
     const g = galleryEl();
     if (!g) return;
@@ -381,7 +393,8 @@ small{color:#9db0ff}
       wrap.className = "photo";
 
       const img = document.createElement("img");
-      img.src = p.url || p.dataUrl;
+     img.src = getPhotoSrc(p);
+
       img.alt = p.name || `Photo ${idx + 1}`;
 
       const meta = document.createElement("div");
@@ -394,48 +407,19 @@ small{color:#9db0ff}
       const del = document.createElement("button");
       del.className = "danger";
       del.textContent = "Retirer";
-   del.onclick = async () => {
-  if (!selectedId) return;
-  if (!confirm("Supprimer cette photo ?")) return;
+      del.onclick = () => {
+        if (!selectedId) return;
+        const t = getTreeById(selectedId);
+        if (!t) return;
+        t.photos = t.photos.filter(p =>
+  !(p.url === photos[idx].url && p.addedAt === photos[idx].addedAt)
+);
 
-  const t = getTreeById(selectedId);
-  if (!t) return;
+        t.updatedAt = Date.now();
+        persistAndRefresh(t.id);
+renderPhotoCarousel(t.photos || []);
 
-  const p = photos[idx];
-
-  if (!p.driveId) {
-    alert("Impossible de supprimer cette photo (ID Drive manquant).");
-    return;
-  }
-
-  // 🔗 suppression serveur (Drive + Sheet)
-  const body = new URLSearchParams();
-  body.append("payload", JSON.stringify({
-    action: "deletePhoto",
-    treeId: t.id,
-    photoDriveId: p.driveId
-  }));
-
-await fetch(API_URL, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    action: "deletePhoto",
-    treeId: t.id,
-    photoDriveId: p.driveId
-  })
-});
-
-
-  // 🧹 suppression locale
-  t.photos = (t.photos || []).filter(ph => ph.driveId !== p.driveId);
-  t.updatedAt = Date.now();
-
-
-  renderGallery(t.photos);
-  renderPhotoCarousel(t.photos);
-};
-
+      };
 
       meta.appendChild(span);
       meta.appendChild(del);
@@ -483,7 +467,7 @@ async function stampPhotoWithMeta(file, lat, lng) {
       ctx.fillText(dateStr, padding, canvas.height - 40);
       ctx.fillText(coordStr, padding, canvas.height - 10);
 
-      resolve(canvas.toDataURL("image/jpeg", 0.7));
+      resolve(canvas.toDataURL("image/jpeg", 0.6));
     };
 
     img.onerror = reject;
@@ -516,6 +500,26 @@ async function readFilesAsDataUrls(files) {
 }
 
 
+async function refreshFromSheets() {
+  try {
+    const res = await fetch(API_URL);
+    if (!res.ok) throw new Error("Sheets indisponible");
+
+    const data = await res.json();
+    if (!Array.isArray(data)) return;
+
+    trees = data;
+    saveTreesLocal();
+
+    renderMarkers();
+    renderList();
+    renderSecteurCount();
+
+    console.log("🔄 Données synchronisées depuis Sheets");
+  } catch (e) {
+    console.warn("Sync Sheets échouée", e);
+  }
+}
 
   // =========================
   // LIST
@@ -691,7 +695,8 @@ document.getElementById("photoCarousel")?.classList.add("hidden");
 
 
   function setSelected(id) {
-    pendingPhotos = []; // 🔥 CRITIQUE : reset état temporaire
+    
+pendingPhotos = [];
 
     selectedId = id;
     const t = id ? getTreeById(id) : null;
@@ -722,26 +727,13 @@ document.getElementById("photoCarousel")?.classList.add("hidden");
     tagsEl().value = (t.tags || []).join(", ");
     commentEl().value = t.comment || "";
 
- // ⚠️ Affichage des photos UNIQUEMENT si arbre déjà enregistré
+  // ⚠️ Affichage des photos UNIQUEMENT si arbre déjà enregistré
 if (t.photos && t.photos.length > 0) {
-
-  (t.photos || []).forEach(p => {
-    if (!p.driveId && p.url) {
-      const extracted = extractDriveIdFromUrl(p.url);
-      if (extracted) {
-        p.driveId = extracted;
-      }
-    }
-  });
-
-  // ✅ affichage seulement (PAS DE SYNC)
   renderGallery(t.photos);
   renderPhotoCarousel(t.photos);
-
 } else {
   document.getElementById("photoCarousel")?.classList.add("hidden");
 }
-
 
 renderTreePreview(t);
 
@@ -916,7 +908,6 @@ function locateUserGPS() {
   // INIT
   // =========================
   function initMap() {
-     if (map) return; // 🔒 protection
     map = L.map("map", {
       zoomControl: true,
       minZoom: 13,
@@ -986,8 +977,15 @@ cameraInput.addEventListener("change", async () => {
   cameraInput.value = "";
 
   updatePhotoStatus();
-  renderGallery(pendingPhotos);
-  renderPhotoCarousel(pendingPhotos); // ✅ AJOUT
+  const t = selectedId ? getTreeById(selectedId) : null;
+const allPhotos = [
+  ...(t?.photos || []),
+  ...pendingPhotos
+];
+
+renderGallery(allPhotos);
+renderPhotoCarousel(allPhotos);
+
 });
 
 
@@ -1107,20 +1105,25 @@ if (toggleListBtn && treeListWrapper) {
   lastDeletedTree = { ...t };
 
   // 🔗 suppression Google Sheets
-  try {
-    const params = new URLSearchParams();
-    params.append("action", "delete");
-    params.append("id", t.id);
-    await fetch(API_URL, { method: "POST", body: params });
-  } catch (e) {
-    console.warn("Suppression Google Sheets échouée", e);
-  }
+ try {
+  const body = new URLSearchParams();
+  body.append("payload", JSON.stringify({ action: "delete", id: t.id }));
+
+  await fetch(API_URL, {
+    method: "POST",
+    mode: "no-cors",
+    body
+  });
+} catch (e) {
+  console.warn("Suppression Google Sheets échouée", e);
+}
+
 
   // 🗑️ suppression locale
   trees = trees.filter(x => x.id !== t.id);
   removeMarker(t.id);
   selectedId = null;
- 
+  saveTreesLocal();
   renderMarkers();
   renderList();
   renderSecteurCount();
@@ -1141,21 +1144,11 @@ if (undoBtn) {
 
     // 🔁 restauration locale
     trees.unshift(t);
-   
+    saveTreesLocal();
     renderMarkers();
     renderList();
     renderSecteurCount();
     setSelected(t.id);
-
-    // 🔧 migration driveId AVANT sauvegarde
-(t.photos || []).forEach(p => {
-  if (!p.driveId && p.url) {
-    const extracted = extractDriveIdFromUrl(p.url);
-    if (extracted) {
-      p.driveId = extracted;
-    }
-  }
-});
 
     // 🔗 restauration Google Sheets
     await syncToSheets(t);
@@ -1186,36 +1179,41 @@ const photos = pendingPhotos.map(p => ({
 
 
 
-      if (selectedId) {
-        // update
-        const t = getTreeById(selectedId);
-        if (!t) return;
+if (selectedId) {
+  // update
+  const t = getTreeById(selectedId);
+  if (!t) return;
 
-        t.lat = lat;
-        t.lng = lng;
-        t.quartier = quartier;
-        t.species = speciesEl().value.trim();
-        t.height = heightEl().value === "" ? null : Number(heightEl().value);
-        t.dbh = dbhEl().value === "" ? null : Number(dbhEl().value);
-        t.secteur = secteurEl().value;
-        t.address = addressEl().value.trim();
-        t.tags = normalizeTags(tagsEl().value);
-        t.comment = commentEl().value.trim();
-        t.updatedAt = Date.now();
-        t.photos = [...(t.photos || []), ...photos];
+  t.lat = lat;
+  t.lng = lng;
+  t.quartier = quartier;
+  t.species = speciesEl().value.trim();
+  t.height = heightEl().value === "" ? null : Number(heightEl().value);
+  t.dbh = dbhEl().value === "" ? null : Number(dbhEl().value);
+  t.secteur = secteurEl().value;
+  t.address = addressEl().value.trim();
+  t.tags = normalizeTags(tagsEl().value);
+  t.comment = commentEl().value.trim();
 
-        await syncToSheets(t);
+  // 🔥 photos : fusion définitive
+  t.photos = [...(t.photos || []), ...pendingPhotos];
+  pendingPhotos = [];
 
-// 🔁 Drive + Sheets = vérité terrain
-await loadTreesFromSheets();
-persistAndRefresh(t.id);
+  t.updatedAt = Date.now();
 
-        cameraInput.value = "";
-        galleryInput.value = "";
-        photoStatus.textContent = "";
-        alert("Arbre mis à jour.");
-        return;
-      }
+  saveTreesLocal();        // 💾 local OK
+  await syncToSheets(t);  // ☁️ Sheets (métadonnées seulement)
+
+  persistAndRefresh(t.id); // 🔁 UI + carte + liste
+
+  cameraInput.value = "";
+  galleryInput.value = "";
+  photoStatus.textContent = "";
+
+  alert("Arbre mis à jour.");
+  return;
+}
+
 
       // create
       const t = {
@@ -1235,12 +1233,11 @@ persistAndRefresh(t.id);
         updatedAt: Date.now(),
       };
 
-    await syncToSheets(t);
+      await syncToSheets(t);
 
-// 🔁 source unique = Sheets
-await loadTreesFromSheets();
-persistAndRefresh(t.id);
-
+      trees.unshift(t);
+      persistAndRefresh(t.id);
+pendingPhotos = [];
 
       treeIdEl().value = t.id;
       cameraInput.value = "";
@@ -1251,19 +1248,21 @@ persistAndRefresh(t.id);
   }
 async function loadTreesFromSheets() {
   try {
-    const res = await fetch(API_URL + "?_=" + Date.now(), { cache: "no-store" });
-    if (!res.ok) throw new Error("Sheets indisponible");
+    const url = API_URL + "?_=" + Date.now(); // ✅ anti-cache
+    const res = await fetch(url, { cache: "no-store" }); // ✅ anti-cache navigateur
+
+    if (!res.ok) throw new Error("Sheets indisponible: " + res.status);
 
     const data = await res.json();
     if (!Array.isArray(data)) throw new Error("Format Sheets invalide");
 
-    console.log("📥 Données chargées depuis Google Sheets :", data.length);
+    trees = data;
+    saveTreesLocal();
 
-    trees = data; // ✅ Sheets = vérité
-
+    console.log("📥 Données chargées depuis Google Sheets :", trees.length);
   } catch (e) {
-    console.warn("❌ Sheets inaccessible → aucun arbre chargé", e);
-    trees = []; // ✅ on vide, on ne ressuscite rien
+    console.warn("⚠️ Impossible de charger depuis Sheets, fallback local", e);
+    trees = loadTrees(); // localStorage
   }
 }
 
@@ -1299,12 +1298,11 @@ applyAgentMode();
     }
 
     // charge stockage
-    initMap();
     await loadTreesFromSheets();
 
 
     // init
-   
+    initMap();
     addLegendToMap();
     wireUI();
 
@@ -1366,23 +1364,12 @@ function updateCarousel() {
   const img = document.getElementById("carouselImage");
   const count = document.getElementById("carouselCount");
 
-  img.src = carouselPhotos[carouselIndex].dataUrl;
+  const p = carouselPhotos[carouselIndex];
+  img.src = getPhotoSrc(p);
+
   count.textContent = `${carouselIndex + 1} / ${carouselPhotos.length}`;
 }
 
-function extractDriveIdFromUrl(url) {
-  if (!url) return null;
 
-  // cas classique: /d/ID/
-  const m1 = url.match(/\/d\/([^/]+)/);
-  if (m1 && m1[1]) return m1[1];
-
-  // cas alternatif: id=ID
-  const m2 = url.match(/[?&]id=([^&]+)/);
-  if (m2 && m2[1]) return m2[1];
-
-  return null;
-}
 
 })();
-
