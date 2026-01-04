@@ -432,15 +432,16 @@ if (!p.driveId && p.url) {
   }
 
   // 🔗 suppression serveur (Drive + Sheets)
-  await fetch(API_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      action: "deletePhoto",
-      treeId: t.id,
-      photoDriveId: photo.driveId
-    })
-  });
+ const params = new URLSearchParams();
+params.append("action", "deletePhoto");
+params.append("treeId", t.id);
+params.append("photoDriveId", photo.driveId);
+
+await fetch(API_URL, {
+  method: "POST",
+  body: params
+});
+
 
   // 🔁 RECHARGER LA VÉRITÉ (Sheets)
   await loadTreesFromSheets();
