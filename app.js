@@ -418,6 +418,7 @@ small{color:#9db0ff}
 
   await fetch(API_URL, {
     method: "POST",
+    mode: "no-cors",
     body
   });
 
