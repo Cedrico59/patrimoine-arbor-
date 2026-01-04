@@ -1,0 +1,207 @@
+function myFunction() {}
+
+/* =========================
+   CORS HELPERS
+========================= */
+function corsResponse(json) {
+  const output = ContentService
+    .createTextOutput(json)
+    .setMimeType(ContentService.MimeType.JSON);
+
+  output.addHeader("Access-Control-Allow-Origin", "*");
+  output.addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  output.addHeader("Access-Control-Allow-Headers", "Content-Type");
+  output.addHeader("Cache-Control", "no-store, no-cache, max-age=0");
+
+  return output;
+}
+
+
+
+function doOptions() {
+  return corsResponse("");
+}
+
+/* =========================
+   GET – LECTURE DES ARBRES
+========================= */
+function doGet() {
+  const sheet = SpreadsheetApp.getActive()
+    .getSheetByName("arbres");
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    return ContentService
+      .createTextOutput(JSON.stringify([]))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  const values = sheet
+    .getRange(2, 1, lastRow - 1, sheet.getLastColumn())
+    .getValues();
+
+  const trees = values.map(row => ({
+    createdAt: row[0]?.getTime?.() || null,
+    id: row[1],
+    lat: Number(row[2]),
+    lng: Number(row[3]),
+    species: row[4],
+    height: row[5] !== "" ? Number(row[5]) : null,
+    dbh: row[6] !== "" ? Number(row[6]) : null,
+    secteur: row[7],
+    address: row[8],
+    tags: row[9] ? row[9].split(",") : [],
+    comment: row[10],
+    photos: [],
+    quartier: row[12] || "Inconnu",
+    updatedAt: Date.now()
+  }));
+
+  return ContentService
+    .createTextOutput(JSON.stringify(trees))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/* =========================
+   DRIVE
+========================= */
+const DRIVE_FOLDER_ID = "1Cl-GHbqX2gIgIjHbNrp20WgtosQs0EYd";
+
+function uploadPhoto(base64, filename) {
+  if (!base64 || !base64.startsWith("data:")) return "";
+
+  const folder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
+  const contentType = base64.match(/^data:(.*);base64,/)[1];
+  const bytes = Utilities.base64Decode(base64.split(",")[1]);
+
+  const blob = Utilities.newBlob(bytes, contentType, filename);
+  const file = folder.createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+  return "https://drive.google.com/uc?export=view&id=" + file.getId();
+}
+
+function deleteDriveFileFromUrl(url) {
+  try {
+    if (!url) return;
+    const match = url.match(/id=([^&]+)/);
+    if (!match) return;
+    DriveApp.getFileById(match[1]).setTrashed(true);
+  } catch (e) {
+    Logger.log("Erreur suppression Drive : " + e);
+  }
+}
+
+/* =========================
+   POST – CREATE / UPDATE / DELETE
+========================= */
+function doPost(e) {
+  const data = e.parameter;
+  const sheet = SpreadsheetApp
+    .getActiveSpreadsheet()
+    .getSheetByName("arbres");
+
+  /* ===== SUPPRESSION ===== */
+  if (data.action === "delete" && data.id) {
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return corsResponse("NOT FOUND");
+
+    const rows = sheet
+      .getRange(2, 1, lastRow - 1, sheet.getLastColumn())
+      .getValues();
+
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i][1] === data.id) {
+
+        // supprimer photos Drive
+        if (rows[i][11]) {
+          rows[i][11].split(",").forEach(deleteDriveFileFromUrl);
+        }
+
+        sheet.deleteRow(i + 2);
+        return corsResponse("DELETED");
+      }
+    }
+    return corsResponse("NOT FOUND");
+  }
+
+  /* ===== PHOTOS EXISTANTES ===== */
+  let existingPhotoUrls = "";
+  const lastRow = sheet.getLastRow();
+
+  if (data.id && lastRow > 1) {
+    const rows = sheet
+      .getRange(2, 1, lastRow - 1, sheet.getLastColumn())
+      .getValues();
+
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i][1] === data.id) {
+        existingPhotoUrls = rows[i][11] || "";
+        break;
+      }
+    }
+  }
+
+  let photoUrls = existingPhotoUrls
+    ? existingPhotoUrls.split(",").filter(Boolean)
+    : [];
+
+  /* ===== NOUVELLES PHOTOS ===== */
+  if (data.photos) {
+    try {
+      const photos = JSON.parse(data.photos);
+      const uploaded = photos
+        .filter(p => p?.dataUrl?.startsWith("data:"))
+        .map((p, i) =>
+          uploadPhoto(p.dataUrl, `${data.id}_${i}_${p.name || "photo.jpg"}`)
+        );
+
+      photoUrls = photoUrls.concat(uploaded);
+    } catch (e) {
+      Logger.log("Erreur photos : " + e);
+    }
+  }
+
+  /* ===== DONNÉES ===== */
+  const rowData = [
+    new Date(),
+    data.id || "",
+    data.lat || "",
+    data.lng || "",
+    data.species || "",
+    data.height || "",
+    data.dbh || "",
+    data.secteur || "",
+    data.address || "",
+    data.tags || "",
+    data.comment || "",
+    photoUrls.join(","),
+    data.quartier || ""   // 👈 AJOUT
+  ];
+
+  /* ===== UPDATE ===== */
+  if (lastRow > 1) {
+    const ids = sheet.getRange(2, 2, lastRow - 1, 1).getValues();
+    for (let i = 0; i < ids.length; i++) {
+      if (ids[i][0] === data.id) {
+        sheet.getRange(i + 2, 1, 1, rowData.length).setValues([rowData]);
+        return corsResponse("UPDATED");
+      }
+    }
+  }
+
+  /* ===== CREATE ===== */
+  sheet.appendRow(rowData);
+
+  if (sheet.getLastRow() > 2) {
+    sheet
+      .getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn())
+      .sort([
+        { column: 8, ascending: true },
+        { column: 9, ascending: true },
+        { column: 5, ascending: true }
+      ]);
+  }
+
+  return corsResponse("CREATED");
+}
