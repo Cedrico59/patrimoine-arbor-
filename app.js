@@ -4,7 +4,7 @@
   // =========================
   // CONFIG
   // =========================
-  const API_URL = "https://script.googleusercontent.com/macros/echo?user_content_key=AehSKLifI0TdMm1lTizjVqZdOGNOauKrcKQ0VXMn0mfnqy61GIYfQJ6EO8Ool4yssNaZNypfPdUEnr0rI5uSMgxPwoJ1sP4faP6WzwTUkc9tYOdTkD8FQ87cscGljYX5R4sP2HTgobm2L0r9h2f5vjqMJKsOT8u_bPYKHAWXzLX-Ta4F5BUh3YRZ4AKjOa3PMSr2gV3h8aRWnLfcXYBszQ7XM2bzfWtTRySEEA3yxtFx-OvUMVlquE_ZbSnXKV6CdxVZNNjyqsy7QfFR2O1g4u7qCyKE6JZnNw&lib=MFuM-0_fRIQw0bD-l033NBRsoTN8THAby";
+  const API_URL = "https://script.google.com/macros/s/AKfycbweINPOfMrI83A2tcUSMiRPdNl92Y-JxPWcnZ7hAK-p_IItZSzCqFQuZmytyoEDVazr/exec";
   const MARCQ_CENTER = [50.676, 3.086];
 console.log("✅ APP.JS CHARGÉ");
 
