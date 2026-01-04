@@ -407,19 +407,40 @@ if (p.driveId) {
       const del = document.createElement("button");
       del.className = "danger";
       del.textContent = "Retirer";
-      del.onclick = () => {
-        if (!selectedId) return;
-        const t = getTreeById(selectedId);
-        if (!t) return;
-        t.photos = t.photos.filter(p =>
-  !(p.url === photos[idx].url && p.addedAt === photos[idx].addedAt)
-);
+     del.onclick = async () => {
+  if (!selectedId) return;
+  if (!confirm("Supprimer cette photo ?")) return;
 
-        t.updatedAt = Date.now();
-        persistAndRefresh(t.id);
-renderPhotoCarousel(t.photos || []);
+  const t = getTreeById(selectedId);
+  if (!t) return;
 
-      };
+  const photo = photos[idx];
+
+  // sécurité : il faut un driveId
+  if (!photo.driveId) {
+    alert("Impossible de supprimer cette photo (ID Drive manquant)");
+    return;
+  }
+
+  // 🔗 suppression serveur (Drive + Sheets)
+  await fetch(API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      action: "deletePhoto",
+      treeId: t.id,
+      photoDriveId: photo.driveId
+    })
+  });
+
+  // 🔁 RECHARGER LA VÉRITÉ (Sheets)
+  await loadTreesFromSheets();
+
+  // 🔄 réafficher l’arbre sélectionné
+  setSelected(t.id);
+  persistAndRefresh(t.id);
+};
+
 
       meta.appendChild(span);
       meta.appendChild(del);
