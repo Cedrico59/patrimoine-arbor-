@@ -416,11 +416,16 @@ small{color:#9db0ff}
     photoDriveId: p.driveId
   }));
 
-  await fetch(API_URL, {
-    method: "POST",
-    mode: "no-cors",
-    body
-  });
+await fetch(API_URL, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    action: "deletePhoto",
+    treeId: t.id,
+    photoDriveId: p.driveId
+  })
+});
+
 
   // 🧹 suppression locale
   t.photos = (t.photos || []).filter(ph => ph.driveId !== p.driveId);
@@ -911,6 +916,7 @@ function locateUserGPS() {
   // INIT
   // =========================
   function initMap() {
+     if (map) return; // 🔒 protection
     map = L.map("map", {
       zoomControl: true,
       minZoom: 13,
@@ -1293,11 +1299,12 @@ applyAgentMode();
     }
 
     // charge stockage
+    initMap();
     await loadTreesFromSheets();
 
 
     // init
-    initMap();
+   
     addLegendToMap();
     wireUI();
 
