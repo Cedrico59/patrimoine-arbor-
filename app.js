@@ -404,10 +404,19 @@ if (p.driveId) {
       const date = p.addedAt ? new Date(p.addedAt).toLocaleString("fr-FR") : "";
       span.textContent = `${p.name || "photo"}${date ? " • " + date : ""}`;
 
+
+      // 🔧 migration locale : récupérer driveId depuis l’URL si manquant
+if (!p.driveId && p.url) {
+  const extracted = extractDriveIdFromUrl(p.url);
+  if (extracted) {
+    p.driveId = extracted;
+  }
+}
+
       const del = document.createElement("button");
       del.className = "danger";
       del.textContent = "Retirer";
-     del.onclick = async () => {
+      del.onclick = async () => {
   if (!selectedId) return;
   if (!confirm("Supprimer cette photo ?")) return;
 
@@ -1389,6 +1398,20 @@ function updateCarousel() {
   img.src = getPhotoSrc(p);
 
   count.textContent = `${carouselIndex + 1} / ${carouselPhotos.length}`;
+}
+
+function extractDriveIdFromUrl(url) {
+  if (!url) return null;
+
+  // format /d/ID/
+  const m1 = url.match(/\/d\/([^/]+)/);
+  if (m1 && m1[1]) return m1[1];
+
+  // format ?id=ID
+  const m2 = url.match(/[?&]id=([^&]+)/);
+  if (m2 && m2[1]) return m2[1];
+
+  return null;
 }
 
 
