@@ -1410,9 +1410,9 @@ function extractDriveIdFromUrl(url) {
 
 function getColorFromEtat(etat) {
   switch (etat) {
-    case "danger": return "#e53935"; // rouge
-    case "watch":  return "#fb8c00"; // orange
-    case "prune":  return "#43a047"; // vert
+    case "dangereux (A abattre)": return "#e53935"; // rouge
+    case "A surveiller":  return "#fb8c00"; // orange
+    case "A élaguer ":  return "#43a047"; // vert
     default: return null;
   }
 }
