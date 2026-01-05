@@ -67,6 +67,30 @@
   // =========================
   // UTIL
   // =========================
+
+async function postToGAS(payload) {
+  const params = new URLSearchParams();
+
+  Object.entries(payload || {}).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+    params.append(
+      key,
+      typeof value === "object" ? JSON.stringify(value) : String(value)
+    );
+  });
+
+  const res = await fetch(API_URL, { method: "POST", body: params });
+  const text = await res.text();
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { ok: false, raw: text };
+  }
+}
+
+
+  
   function uid() {
     return Math.random().toString(16).slice(2) + Date.now().toString(16);
   }
@@ -126,17 +150,10 @@ async function syncToSheets(treeObj) {
       p => p.dataUrl && p.dataUrl.startsWith("data:")
     );
 
-    const body = new URLSearchParams();
-    body.append("payload", JSON.stringify(payload));
+  await postToGAS({ payload });
+await loadTreesFromSheets();
 
-    await fetch(API_URL, {
-      method: "POST",
-      mode: "no-cors",
-      body
-    });
 
-    // ✅ ensuite on recharge depuis Sheets pour être sûr
-    await loadTreesFromSheets();
 
   } catch (e) {
     console.error("❌ Sync Google Sheets échouée", e);
@@ -327,23 +344,7 @@ small{color:#9db0ff}
   // =========================
   // GALLERY
   // =========================
-function getDriveIdFromUrl(url) {
-  if (!url) return null;
 
-  // /file/d/<id>/view
-  let m = url.match(/\/d\/([a-zA-Z0-9_-]{10,})/);
-  if (m && m[1]) return m[1];
-
-  // ?id=<id>
-  m = url.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
-  if (m && m[1]) return m[1];
-
-  // open?id=<id>
-  m = url.match(/open\?id=([a-zA-Z0-9_-]{10,})/);
-  if (m && m[1]) return m[1];
-
-  return null;
-}
 
 function getPhotoSrc(p) {
   if (!p) return "";
@@ -363,7 +364,8 @@ if (p.driveId) {
   if (p.url) {
     // /file/d/XXXX/view
     let m = p.url.match(/\/d\/([a-zA-Z0-9_-]{10,})/);
-    if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w1200`;
+if (m && m[1]) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w1200`;
+
 
 
     // ?id=XXXX
@@ -432,22 +434,21 @@ if (!p.driveId && p.url) {
   }
 
   // 🔗 suppression serveur (Drive + Sheets)
- const params = new URLSearchParams();
-params.append("action", "deletePhoto");
-params.append("treeId", t.id);
-params.append("photoDriveId", photo.driveId);
 
-await fetch(API_URL, {
-  method: "POST",
-  body: params
+
+await postToGAS({
+  action: "deletePhoto",
+  treeId: t.id,
+  photoDriveId: photo.driveId
 });
+
 
 
   // 🔁 RECHARGER LA VÉRITÉ (Sheets)
   await loadTreesFromSheets();
 
   // 🔄 réafficher l’arbre sélectionné
-  setSelected(t.id);
+  
   persistAndRefresh(t.id);
 };
 
@@ -531,26 +532,7 @@ async function readFilesAsDataUrls(files) {
 }
 
 
-async function refreshFromSheets() {
-  try {
-    const res = await fetch(API_URL);
-    if (!res.ok) throw new Error("Sheets indisponible");
 
-    const data = await res.json();
-    if (!Array.isArray(data)) return;
-
-    trees = data;
-    saveTreesLocal();
-
-    renderMarkers();
-    renderList();
-    renderSecteurCount();
-
-    console.log("🔄 Données synchronisées depuis Sheets");
-  } catch (e) {
-    console.warn("Sync Sheets échouée", e);
-  }
-}
 
   // =========================
   // LIST
@@ -1137,14 +1119,13 @@ if (toggleListBtn && treeListWrapper) {
 
   // 🔗 suppression Google Sheets
  try {
-  const body = new URLSearchParams();
-  body.append("payload", JSON.stringify({ action: "delete", id: t.id }));
+  
 
-  await fetch(API_URL, {
-    method: "POST",
-    mode: "no-cors",
-    body
-  });
+ await postToGAS({
+  action: "delete",
+  id: t.id
+});
+
 } catch (e) {
   console.warn("Suppression Google Sheets échouée", e);
 }
