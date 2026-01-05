@@ -1424,7 +1424,7 @@ function getColorFromEtat(etat) {
 function renderEtatBadge(etat) {
   if (!etat) return "";
 
-  if (etat === "danger") {
+  if (etat === "Dangereux (A abattre") {
     // 🔴 croix rouge
     return `
       <circle cx="48" cy="16" r="8" fill="#e53935" stroke="#fff" stroke-width="2"/>
@@ -1433,12 +1433,12 @@ function renderEtatBadge(etat) {
     `;
   }
 
-  if (etat === "watch") {
+  if (etat === "A surveiller") {
     // 🟠 pastille orange
     return `<circle cx="48" cy="16" r="8" fill="#fb8c00" stroke="#fff" stroke-width="2"/>`;
   }
 
-  if (etat === "prune") {
+  if (etat === "A élaguer") {
     // 🟢 pastille verte
     return `<circle cx="48" cy="16" r="8" fill="#43a047" stroke="#fff" stroke-width="2"/>`;
   }
