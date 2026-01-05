@@ -1274,7 +1274,6 @@ async function loadTreesFromSheets() {
     console.log("📥 Données chargées depuis Google Sheets :", trees.length);
   } catch (e) {
     console.warn("⚠️ Impossible de charger depuis Sheets, fallback local", e);
-    trees = loadTrees(); // localStorage
   }
 }
 
