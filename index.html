@@ -338,6 +338,14 @@ body.agent-mode button {
       <label>Tags (séparés par des virgules)</label>
       <input id="tags" type="text" placeholder="Ex: remarquable, alignement, parc, malade..." />
 
+      <label>État de l’arbre</label>
+<select id="etat">
+  <option value="">— Aucun —</option>
+  <option value="danger">🔴 Dangereux (abattre)</option>
+  <option value="watch">🟠 À surveiller</option>
+  <option value="prune">🟢 À élaguer</option>
+</select>
+
       <label>Commentaire</label>
       <textarea id="comment" placeholder="Note d’observation, état sanitaire, histoire, etc."></textarea>
 

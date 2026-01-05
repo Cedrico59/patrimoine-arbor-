@@ -53,6 +53,7 @@
   const secteurEl = () => el("secteur");
   const addressEl = () => el("address");
   const tagsEl = () => el("tags");
+  const etatEl = () => el("etat");
   const commentEl = () => el("comment");
   const photosEl = () => el("photos");
   const galleryEl = () => el("gallery");
@@ -738,6 +739,7 @@ pendingPhotos = [];
     secteurEl().value = t.secteur || "";
     addressEl().value = t.address || "";
     tagsEl().value = (t.tags || []).join(", ");
+    etatEl().value = t.etat || "";
     commentEl().value = t.comment || "";
 
   // ⚠️ Affichage des photos UNIQUEMENT si arbre déjà enregistré
@@ -773,9 +775,13 @@ renderTreePreview(t);
       return;
     }
 
-    const m = L.marker([t.lat, t.lng], {
-      icon: createTreeIcon(getColorFromSecteur(t.secteur)),
-    }).addTo(map);
+    const etatColor = getColorFromEtat(t.etat);
+const color = etatColor || getColorFromSecteur(t.secteur);
+
+const m = L.marker([t.lat, t.lng], {
+  icon: createTreeIcon(color),
+}).addTo(map);
+
 
     m.bindPopup(popupHtml);
     m.on("click", () => {
@@ -1205,6 +1211,7 @@ if (selectedId) {
   t.secteur = secteurEl().value;
   t.address = addressEl().value.trim();
   t.tags = normalizeTags(tagsEl().value);
+  t.etat = etatEl().value || "";
   t.comment = commentEl().value.trim();
 
   // 🔥 photos : fusion définitive
@@ -1239,6 +1246,7 @@ if (selectedId) {
         secteur: secteurEl().value,
         address: addressEl().value.trim(),
         tags: normalizeTags(tagsEl().value),
+        etat: etatEl().value || "",
         comment: commentEl().value.trim(),
         photos,
         createdAt: Date.now(),
@@ -1396,5 +1404,13 @@ function extractDriveIdFromUrl(url) {
 }
 
 
+function getColorFromEtat(etat) {
+  switch (etat) {
+    case "danger": return "#e53935"; // rouge
+    case "watch":  return "#fb8c00"; // orange
+    case "prune":  return "#43a047"; // vert
+    default: return null;
+  }
+}
 
 })();
