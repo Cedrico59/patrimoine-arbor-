@@ -167,20 +167,17 @@ await loadTreesFromSheets();
   // =========================
   // ICONS / COLORS
   // =========================
- function createTreeIcon(color = "#4CAF50") {
+ function createTreeIcon(color = "#4CAF50", etat = "") {
   return L.divIcon({
     className: "tree-marker",
     html: `
       <svg width="42" height="42" viewBox="0 0 64 64">
-        <!-- TRONC D'ABORD -->
+        <!-- 🌳 ARBRE (INCHANGÉ) -->
+        <circle cx="32" cy="26" r="20" fill="${color}"/>
         <rect x="28" y="38" width="8" height="18" rx="2" fill="#6D4C41"/>
 
-        <!-- PASTILLE PAR-DESSUS -->
-        <circle cx="32" cy="26" r="20"
-          fill="${color}"
-          stroke="#000"
-          stroke-width="2"
-        />
+        <!-- 🚨 BADGE ÉTAT -->
+        ${renderEtatBadge(etat)}
       </svg>
     `,
     iconSize: [42, 42],
@@ -188,6 +185,7 @@ await loadTreesFromSheets();
     popupAnchor: [0, -36],
   });
 }
+
 
 
   function getColorFromSecteur(secteur) {
@@ -770,7 +768,11 @@ renderTreePreview(t);
       m.setLatLng([t.lat, t.lng]);
      const etatColor = getColorFromEtat(t.etat);
 const color = etatColor || getColorFromSecteur(t.secteur);
-m.setIcon(createTreeIcon(color));
+m.setIcon(createTreeIcon(
+  getColorFromSecteur(t.secteur),
+  t.etat
+));
+
 
       m.bindPopup(popupHtml);
       return;
@@ -780,7 +782,11 @@ m.setIcon(createTreeIcon(color));
 const color = etatColor || getColorFromSecteur(t.secteur);
 
 const m = L.marker([t.lat, t.lng], {
-  icon: createTreeIcon(color),
+  icon: createTreeIcon(
+  getColorFromSecteur(t.secteur),
+  t.etat
+),
+
 }).addTo(map);
 
 
@@ -1413,6 +1419,31 @@ function getColorFromEtat(etat) {
     case "A élaguer":  return "#43a047"; // vert
     default: return null;
   }
+}
+
+function renderEtatBadge(etat) {
+  if (!etat) return "";
+
+  if (etat === "danger") {
+    // 🔴 croix rouge
+    return `
+      <circle cx="48" cy="16" r="8" fill="#e53935" stroke="#fff" stroke-width="2"/>
+      <line x1="44" y1="12" x2="52" y2="20" stroke="#fff" stroke-width="2"/>
+      <line x1="52" y1="12" x2="44" y2="20" stroke="#fff" stroke-width="2"/>
+    `;
+  }
+
+  if (etat === "watch") {
+    // 🟠 pastille orange
+    return `<circle cx="48" cy="16" r="8" fill="#fb8c00" stroke="#fff" stroke-width="2"/>`;
+  }
+
+  if (etat === "prune") {
+    // 🟢 pastille verte
+    return `<circle cx="48" cy="16" r="8" fill="#43a047" stroke="#fff" stroke-width="2"/>`;
+  }
+
+  return "";
 }
 
 })();
