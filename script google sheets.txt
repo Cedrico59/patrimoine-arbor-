@@ -1,38 +1,22 @@
+const SPREADSHEET_ID = "1EJsPjWfLKoxfOijnaixeo_ZcUtHrDka16_by9gjq_ns";
 function myFunction() {}
-
-/* =========================
-   CORS HELPERS
-========================= */
-function corsResponse(json) {
-  const output = ContentService
-    .createTextOutput(json)
-    .setMimeType(ContentService.MimeType.JSON);
-
-  output.addHeader("Access-Control-Allow-Origin", "*");
-  output.addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  output.addHeader("Access-Control-Allow-Headers", "Content-Type");
-  output.addHeader("Cache-Control", "no-store, no-cache, max-age=0");
-
-  return output;
+function TEST_DRIVE_LINKED() {
+  DriveApp.createFile("test_linked_drive.txt", "OK");
 }
 
-
-
-function doOptions() {
-  return corsResponse("");
-}
 
 /* =========================
    GET – LECTURE DES ARBRES
 ========================= */
 function doGet() {
-  const sheet = SpreadsheetApp.getActive()
-    .getSheetByName("arbres");
+  const sheet = SpreadsheetApp
+    .openById(SPREADSHEET_ID)
+    .getSheetByName("Patrimoine_arboré");
 
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) {
     return ContentService
-      .createTextOutput(JSON.stringify([]))
+      .createTextOutput("[]")
       .setMimeType(ContentService.MimeType.JSON);
   }
 
@@ -40,168 +24,283 @@ function doGet() {
     .getRange(2, 1, lastRow - 1, sheet.getLastColumn())
     .getValues();
 
-  const trees = values.map(row => ({
-    createdAt: row[0]?.getTime?.() || null,
-    id: row[1],
-    lat: Number(row[2]),
-    lng: Number(row[3]),
-    species: row[4],
-    height: row[5] !== "" ? Number(row[5]) : null,
-    dbh: row[6] !== "" ? Number(row[6]) : null,
-    secteur: row[7],
-    address: row[8],
-    tags: row[9] ? row[9].split(",") : [],
-    comment: row[10],
-    photos: [],
-    quartier: row[12] || "Inconnu",
-    updatedAt: Date.now()
-  }));
+  const trees = values
+    .map(row => {
+      const lat = Number(row[2]);
+      const lng = Number(row[3]);
+
+      return {
+        createdAt: row[0]?.getTime?.() || null,
+        id: row[1],
+        lat,
+        lng,
+        species: row[4],
+        height: row[5] !== "" ? Number(row[5]) : null,
+        dbh: row[6] !== "" ? Number(row[6]) : null,
+        secteur: row[7],
+        address: row[8],
+        tags: row[9] ? String(row[9]).split(",") : [],
+        comment: row[10],
+
+        photos: (() => {
+          if (!row[11]) return [];
+          try { return JSON.parse(row[11]); }
+          catch (e) { return []; }
+        })(),
+
+        quartier: row[12] || "Inconnu",
+        updatedAt: row[13] ? Number(row[13]) : null
+      };
+    })
+    // sécurité : seulement les arbres valides
+    .filter(t => t.id && Number.isFinite(t.lat) && Number.isFinite(t.lng));
 
   return ContentService
     .createTextOutput(JSON.stringify(trees))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+
 /* =========================
    DRIVE
 ========================= */
-const DRIVE_FOLDER_ID = "1Cl-GHbqX2gIgIjHbNrp20WgtosQs0EYd";
+const DRIVE_FOLDER_ID = "1EIZe632G9eADrxzIlpGALlSRHyUG1QLu";
 
-function uploadPhoto(base64, filename) {
-  if (!base64 || !base64.startsWith("data:")) return "";
+// 📁 1 dossier par arbre
+function getOrCreateTreeFolder(treeId) {
+  const root = DriveApp.getFolderById(DRIVE_FOLDER_ID);
+  const folders = root.getFoldersByName(treeId);
+  return folders.hasNext() ? folders.next() : root.createFolder(treeId);
+}
 
-  const folder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
-  const contentType = base64.match(/^data:(.*);base64,/)[1];
+// 📸 upload photo base64 → Drive
+function uploadPhoto(base64, filename, treeId) {
+  if (!base64 || !base64.startsWith("data:")) return null;
+
+  const folder = getOrCreateTreeFolder(treeId);
+  const match = base64.match(/^data:(.*);base64,/);
+  if (!match) return null;
+
+  const contentType = match[1];
   const bytes = Utilities.base64Decode(base64.split(",")[1]);
-
   const blob = Utilities.newBlob(bytes, contentType, filename);
+
   const file = folder.createFile(blob);
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 
-  return "https://drive.google.com/uc?export=view&id=" + file.getId();
-}
-
-function deleteDriveFileFromUrl(url) {
-  try {
-    if (!url) return;
-    const match = url.match(/id=([^&]+)/);
-    if (!match) return;
-    DriveApp.getFileById(match[1]).setTrashed(true);
-  } catch (e) {
-    Logger.log("Erreur suppression Drive : " + e);
-  }
+  return {
+  driveId: file.getId(),   // ⭐ CRITIQUE
+  url: file.getUrl(),
+  name: filename,
+  addedAt: Date.now()
+};
 }
 
 /* =========================
    POST – CREATE / UPDATE / DELETE
 ========================= */
 function doPost(e) {
-  const data = e.parameter;
-  const sheet = SpreadsheetApp
-    .getActiveSpreadsheet()
-    .getSheetByName("arbres");
+  try {
+    let data = {};
 
-  /* ===== SUPPRESSION ===== */
-  if (data.action === "delete" && data.id) {
+    // ✅ Accepte :
+    // - payload JSON (payload=...)
+    // - paramètres directs (action=...&id=...)
+    // - JSON brut dans le body
+    if (e && e.parameter && Object.keys(e.parameter).length) {
+      if (e.parameter.payload) {
+        data = JSON.parse(e.parameter.payload);
+      } else {
+        // paramètres directs
+        data = { ...e.parameter };
+      }
+    } else if (e && e.postData && e.postData.contents) {
+      data = JSON.parse(e.postData.contents);
+    } else {
+      throw new Error("Aucun payload reçu");
+    }
+
+    // ✅ si on reçoit { payload: {...} }
+    if (data && data.payload) data = data.payload;
+
+    const sheet = SpreadsheetApp
+      .openById(SPREADSHEET_ID)
+      .getSheetByName("Patrimoine_arboré");
+
     const lastRow = sheet.getLastRow();
-    if (lastRow < 2) return corsResponse("NOT FOUND");
 
-    const rows = sheet
-      .getRange(2, 1, lastRow - 1, sheet.getLastColumn())
-      .getValues();
+    /* ===== SUPPRESSION PHOTO ===== */
+    if (data.action === "deletePhoto" && data.photoDriveId && data.treeId) {
+      const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
 
-    for (let i = 0; i < rows.length; i++) {
-      if (rows[i][1] === data.id) {
+      for (let i = 0; i < rows.length; i++) {
+        const sheetTreeId = String(rows[i][1]).trim();
+        if (sheetTreeId === String(data.treeId).trim()) {
 
-        // supprimer photos Drive
-        if (rows[i][11]) {
-          rows[i][11].split(",").forEach(deleteDriveFileFromUrl);
+          let photos = [];
+          try {
+            photos = rows[i][11] ? JSON.parse(rows[i][11]) : [];
+          } catch (err) {
+            photos = [];
+          }
+
+          // Drive
+          deletePhotoFromDrive(String(data.photoDriveId).trim());
+
+          // Sheets
+          const newPhotos = photos.filter(p =>
+            String(p.driveId || "").trim() !== String(data.photoDriveId).trim()
+          );
+
+          sheet.getRange(i + 2, 12).setValue(JSON.stringify(newPhotos));
+          SpreadsheetApp.flush();
+
+          return ok({ status: "PHOTO_DELETED", remaining: newPhotos.length });
         }
+      }
 
-        sheet.deleteRow(i + 2);
-        return corsResponse("DELETED");
+      return ok({ status: "NOT_FOUND" });
+    }
+
+    /* ===== SUPPRESSION ARBRE ===== */
+    if (data.action === "delete" && data.id) {
+      if (lastRow < 2) return ok({ status: "NOT_FOUND" });
+
+      const rows = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues();
+
+      for (let i = 0; i < rows.length; i++) {
+        if (String(rows[i][1]).trim() === String(data.id).trim()) {
+          deleteTreeFolder(String(data.id).trim());
+          sheet.deleteRow(i + 2);
+          SpreadsheetApp.flush();
+          return ok({ status: "DELETED" });
+        }
+      }
+
+      return ok({ status: "NOT_FOUND" });
+    }
+
+    // ✅ create/update -> id obligatoire
+    if (!data.id) throw new Error("id manquant (create/update)");
+
+    // ✅ conversions si on est passé par e.parameter (tout est string)
+    if (typeof data.tags === "string") {
+      try { data.tags = JSON.parse(data.tags); } catch { data.tags = String(data.tags).split(",").map(s => s.trim()).filter(Boolean); }
+    }
+    if (typeof data.photos === "string") {
+      try { data.photos = JSON.parse(data.photos); } catch { data.photos = []; }
+    }
+
+    /* ===== PHOTOS EXISTANTES ===== */
+    let existingPhotos = [];
+    if (lastRow > 1) {
+      const rows = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues();
+      for (let i = 0; i < rows.length; i++) {
+        if (String(rows[i][1]).trim() === String(data.id).trim() && rows[i][11]) {
+          existingPhotos = JSON.parse(rows[i][11]);
+          break;
+        }
       }
     }
-    return corsResponse("NOT FOUND");
-  }
 
-  /* ===== PHOTOS EXISTANTES ===== */
-  let existingPhotoUrls = "";
-  const lastRow = sheet.getLastRow();
+    /* ===== NOUVELLES PHOTOS ===== */
+    let uploadedPhotos = [];
+    if (Array.isArray(data.photos)) {
+      uploadedPhotos = data.photos
+        .map(p => uploadPhoto(
+          p.dataUrl,
+          `${Date.now()}_${p.name || "photo.jpg"}`,
+          data.id
+        ))
+        .filter(Boolean);
+    }
 
-  if (data.id && lastRow > 1) {
-    const rows = sheet
-      .getRange(2, 1, lastRow - 1, sheet.getLastColumn())
-      .getValues();
+    const allPhotos = existingPhotos.concat(uploadedPhotos);
 
-    for (let i = 0; i < rows.length; i++) {
-      if (rows[i][1] === data.id) {
-        existingPhotoUrls = rows[i][11] || "";
-        break;
+    /* ===== DONNÉES ===== */
+    const rowData = [
+      new Date(),
+      data.id || "",
+      data.lat || "",
+      data.lng || "",
+      data.species || "",
+      data.height || "",
+      data.dbh || "",
+      data.secteur || "",
+      data.address || "",
+      (data.tags || []).join(","),
+      data.comment || "",
+      JSON.stringify(allPhotos),
+      data.quartier || ""
+    ];
+
+    /* ===== UPDATE ===== */
+    if (lastRow > 1) {
+      const ids = sheet.getRange(2, 2, lastRow - 1, 1).getValues();
+      for (let i = 0; i < ids.length; i++) {
+        if (String(ids[i][0]).trim() === String(data.id).trim()) {
+          sheet.getRange(i + 2, 1, 1, rowData.length).setValues([rowData]);
+          SpreadsheetApp.flush();
+          return ok({ status: "UPDATED", photos: allPhotos });
+        }
       }
     }
+
+    /* ===== CREATE ===== */
+    sheet.appendRow(rowData);
+    SpreadsheetApp.flush();
+    return ok({ status: "CREATED", photos: allPhotos });
+
+  } catch (err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: false, error: String(err) }))
+      .setMimeType(ContentService.MimeType.JSON);
   }
-
-  let photoUrls = existingPhotoUrls
-    ? existingPhotoUrls.split(",").filter(Boolean)
-    : [];
-
-  /* ===== NOUVELLES PHOTOS ===== */
-  if (data.photos) {
-    try {
-      const photos = JSON.parse(data.photos);
-      const uploaded = photos
-        .filter(p => p?.dataUrl?.startsWith("data:"))
-        .map((p, i) =>
-          uploadPhoto(p.dataUrl, `${data.id}_${i}_${p.name || "photo.jpg"}`)
-        );
-
-      photoUrls = photoUrls.concat(uploaded);
-    } catch (e) {
-      Logger.log("Erreur photos : " + e);
-    }
-  }
-
-  /* ===== DONNÉES ===== */
-  const rowData = [
-    new Date(),
-    data.id || "",
-    data.lat || "",
-    data.lng || "",
-    data.species || "",
-    data.height || "",
-    data.dbh || "",
-    data.secteur || "",
-    data.address || "",
-    data.tags || "",
-    data.comment || "",
-    photoUrls.join(","),
-    data.quartier || ""   // 👈 AJOUT
-  ];
-
-  /* ===== UPDATE ===== */
-  if (lastRow > 1) {
-    const ids = sheet.getRange(2, 2, lastRow - 1, 1).getValues();
-    for (let i = 0; i < ids.length; i++) {
-      if (ids[i][0] === data.id) {
-        sheet.getRange(i + 2, 1, 1, rowData.length).setValues([rowData]);
-        return corsResponse("UPDATED");
-      }
-    }
-  }
-
-  /* ===== CREATE ===== */
-  sheet.appendRow(rowData);
-
-  if (sheet.getLastRow() > 2) {
-    sheet
-      .getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn())
-      .sort([
-        { column: 8, ascending: true },
-        { column: 9, ascending: true },
-        { column: 5, ascending: true }
-      ]);
-  }
-
-  return corsResponse("CREATED");
 }
+
+
+
+/* =========================
+   UTIL
+========================= */
+function ok(payload) {
+  const output = ContentService.createTextOutput(
+    JSON.stringify({ ok: true, result: payload })
+  );
+  output.setMimeType(ContentService.MimeType.JSON);
+
+
+
+  return output;
+}
+
+
+function deletePhotoFromDrive(driveId) {
+  try {
+    if (!driveId) return false;
+    DriveApp.getFileById(driveId).setTrashed(true);
+    return true;
+  } catch (e) {
+    Logger.log("Erreur suppression photo Drive: " + e);
+    return false;
+  }
+}
+
+function deleteTreeFolder(treeId) {
+  const root = DriveApp.getFolderById(DRIVE_FOLDER_ID);
+  const folders = root.getFoldersByName(treeId);
+
+  while (folders.hasNext()) {
+    const folder = folders.next();
+    folder.setTrashed(true);
+  }
+}
+
+function assertSheetAlive() {
+  const file = DriveApp.getFileById(SPREADSHEET_ID);
+  if (file.isTrashed()) {
+    throw new Error("❌ Le Spreadsheet est dans la corbeille !");
+  }
+}
+
+
