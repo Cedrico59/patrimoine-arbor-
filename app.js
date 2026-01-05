@@ -770,7 +770,10 @@ renderTreePreview(t);
     if (markers.has(t.id)) {
       const m = markers.get(t.id);
       m.setLatLng([t.lat, t.lng]);
-      m.setIcon(createTreeIcon(getColorFromSecteur(t.secteur)));
+     const etatColor = getColorFromEtat(t.etat);
+const color = etatColor || getColorFromSecteur(t.secteur);
+m.setIcon(createTreeIcon(color));
+
       m.bindPopup(popupHtml);
       return;
     }
@@ -781,6 +784,7 @@ const color = etatColor || getColorFromSecteur(t.secteur);
 const m = L.marker([t.lat, t.lng], {
   icon: createTreeIcon(color),
 }).addTo(map);
+
 
 
     m.bindPopup(popupHtml);
