@@ -167,30 +167,28 @@ await loadTreesFromSheets();
   // =========================
   // ICONS / COLORS
   // =========================
-  function createTreeIcon(color = "#4CAF50") {
-    const gradientId = "g_" + Math.random().toString(36).slice(2);
+ function createTreeIcon(color = "#4CAF50") {
+  return L.divIcon({
+    className: "tree-marker",
+    html: `
+      <svg width="42" height="42" viewBox="0 0 64 64">
+        <!-- TRONC D'ABORD -->
+        <rect x="28" y="38" width="8" height="18" rx="2" fill="#6D4C41"/>
 
-    return L.divIcon({
-      className: "tree-marker",
-      html: `
-        <svg width="42" height="42" viewBox="0 0 64 64">
-          <defs>
-            <radialGradient id="${gradientId}" cx="50%" cy="40%" r="50%">
-              <stop offset="0%" stop-color="#7CFC90"/>
-              <stop offset="100%" stop-color="${color}"/>
-            </radialGradient>
-          </defs>
-          <circle cx="32" cy="26" r="20" fill="url(#${gradientId})"/>
-          <circle cx="22" cy="30" r="14" fill="url(#${gradientId})" opacity="0.9"/>
-          <circle cx="42" cy="30" r="14" fill="url(#${gradientId})" opacity="0.9"/>
-          <rect x="28" y="38" width="8" height="18" rx="2" fill="#6D4C41"/>
-        </svg>
-      `,
-      iconSize: [42, 42],
-      iconAnchor: [21, 40],
-      popupAnchor: [0, -36],
-    });
-  }
+        <!-- PASTILLE PAR-DESSUS -->
+        <circle cx="32" cy="26" r="20"
+          fill="${color}"
+          stroke="#000"
+          stroke-width="2"
+        />
+      </svg>
+    `,
+    iconSize: [42, 42],
+    iconAnchor: [21, 40],
+    popupAnchor: [0, -36],
+  });
+}
+
 
   function getColorFromSecteur(secteur) {
     switch (secteur) {
