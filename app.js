@@ -222,6 +222,13 @@ function createTreeIcon(color = "#4CAF50", etat = "") {
   });
 }
 
+function getTreeIconScale(zoom) {
+  if (zoom >= 17) return 1;     // zoom proche
+  if (zoom >= 16) return 0.9;
+  if (zoom >= 15) return 0.8;
+  if (zoom >= 14) return 0.7;
+  return 0.6;                  // zoom éloigné
+}
 
 
 
