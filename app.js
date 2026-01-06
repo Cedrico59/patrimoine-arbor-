@@ -168,26 +168,34 @@ await loadTreesFromSheets();
   // ICONS / COLORS
   // =========================
 function createTreeIcon(color = "#4CAF50") {
+  const g = "g_" + Math.random().toString(36).slice(2);
+
   return L.divIcon({
     className: "tree-marker",
     html: `
-      <svg width="44" height="56" viewBox="0 0 44 56" xmlns="http://www.w3.org/2000/svg">
-        <!-- Pin -->
-        <path d="M22 0C10 0 0 10 0 22c0 16.5 22 34 22 34s22-17.5 22-34C44 10 34 0 22 0z"
-              fill="${color}" />
+      <svg width="44" height="44" viewBox="0 0 64 64">
+        <defs>
+          <radialGradient id="${g}" cx="50%" cy="35%" r="60%">
+            <stop offset="0%" stop-color="#b7f7c2"/>
+            <stop offset="100%" stop-color="${color}"/>
+          </radialGradient>
+        </defs>
 
-        <!-- Arbre -->
-        <circle cx="22" cy="18" r="8" fill="#66bb6a"/>
-        <circle cx="17" cy="21" r="6" fill="#5fa85d"/>
-        <circle cx="27" cy="21" r="6" fill="#5fa85d"/>
-        <rect x="20" y="26" width="4" height="10" rx="1" fill="#6D4C41"/>
+        <!-- feuillage -->
+        <circle cx="32" cy="22" r="18" fill="url(#${g})"/>
+        <circle cx="20" cy="28" r="14" fill="url(#${g})"/>
+        <circle cx="44" cy="28" r="14" fill="url(#${g})"/>
+
+        <!-- tronc -->
+        <rect x="28" y="36" width="8" height="18" rx="2" fill="#6D4C41"/>
       </svg>
     `,
-    iconSize: [44, 56],
-    iconAnchor: [22, 56],
-    popupAnchor: [0, -48],
+    iconSize: [44, 44],
+    iconAnchor: [22, 42],
+    popupAnchor: [0, -38],
   });
 }
+
 
 
 
