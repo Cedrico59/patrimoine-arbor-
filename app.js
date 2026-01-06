@@ -1315,8 +1315,19 @@ pendingPhotos = [];
   }
 async function loadTreesFromSheets() {
   try {
-    const url = API_URL + "?token=" + encodeURIComponent(authToken) + "&_=" + Date.now(); // ✅ anti-cache
-    const res = await fetch(url, { cache: "no-store" }); // ✅ anti-cache navigateur
+    if (!authToken) {
+      console.warn("⛔ Pas de token, chargement Sheets annulé");
+      return;
+    }
+
+    const url =
+      API_URL +
+      "?token=" + encodeURIComponent(authToken) +
+      "&_=" + Date.now();
+
+    const res = await fetch(url, {
+      cache: "no-store"
+    });
 
     if (!res.ok) throw new Error("Sheets indisponible: " + res.status);
 
@@ -1331,6 +1342,7 @@ async function loadTreesFromSheets() {
     console.warn("⚠️ Impossible de charger depuis Sheets, fallback local", e);
   }
 }
+
 
 let isAgentMode = localStorage.getItem("agentMode") === "true";
 
