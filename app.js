@@ -762,6 +762,22 @@ renderTreePreview(t);
   // =========================
   // MAP + LAYERS
   // =========================
+function createTreeIcon(color) {
+  return L.divIcon({
+    className: "tree-marker",
+    html: `
+      <svg width="42" height="42" viewBox="0 0 64 64">
+        <circle cx="32" cy="26" r="20" fill="${color}" />
+        <rect x="28" y="38" width="8" height="18" rx="2" fill="#6D4C41" />
+      </svg>
+    `,
+    iconSize: [42, 42],
+    iconAnchor: [21, 40],
+    popupAnchor: [0, -36],
+  });
+}
+
+
 function addOrUpdateMarker(t) {
 
   // 🌳 marqueur arbre principal (INCHANGÉ)
