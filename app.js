@@ -171,16 +171,25 @@ await loadTreesFromSheets();
   return L.divIcon({
     className: "tree-marker",
     html: `
-      <svg width="42" height="42" viewBox="0 0 64 64">
-        <circle cx="32" cy="26" r="20" fill="${color}" />
-        <rect x="28" y="38" width="8" height="18" rx="2" fill="#6D4C41" />
+      <svg width="46" height="46" viewBox="0 0 64 64">
+        <!-- Feuillage -->
+        <circle cx="32" cy="22" r="18" fill="${color}" />
+        <circle cx="22" cy="26" r="14" fill="${color}" opacity="0.9"/>
+        <circle cx="42" cy="26" r="14" fill="${color}" opacity="0.9"/>
+
+        <!-- Tronc -->
+        <rect x="28" y="34" width="8" height="18" rx="2" fill="#6D4C41"/>
+
+        <!-- Ombre -->
+        <ellipse cx="32" cy="54" rx="12" ry="3" fill="rgba(0,0,0,0.25)"/>
       </svg>
     `,
-    iconSize: [42, 42],
-    iconAnchor: [21, 40],
-    popupAnchor: [0, -36],
+    iconSize: [46, 46],
+    iconAnchor: [23, 46],
+    popupAnchor: [0, -40],
   });
 }
+
 
 function createEtatBadgeIcon(etat) {
   if (!etat) return null;
