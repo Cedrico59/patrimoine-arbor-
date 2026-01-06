@@ -173,20 +173,14 @@ function createTreeIcon(color = "#4CAF50", etat = "") {
   let badge = "";
 
  if (etat === "Dangereux (A abattre)") {
-  badge = `
-    <!-- halo pulsant -->
-    <circle cx="46" cy="10" r="8"
-      fill="#e53935"
-      opacity="0.7"
-      style="animation: pulseDanger 1.8s infinite;"
-    />
+ badge = `
+  <circle class="pulse-ring danger"
+          cx="46" cy="10" r="10"
+          fill="#e53935"
+          opacity="0.55"
+          style="transform-origin:46px 10px; transform-box:fill-box;" />
+  <circle cx="46" cy="10" r="8" fill="#e53935" stroke="#000000ff" stroke-width="2"/>`;
 
-    <!-- pastille centrale -->
-    <circle cx="46" cy="10" r="8"
-      fill="#e53935"
-      stroke="#000000ff"
-      stroke-width="1.5"
-    />`;
 }
 
 
