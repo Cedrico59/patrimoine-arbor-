@@ -1315,7 +1315,7 @@ pendingPhotos = [];
   }
 async function loadTreesFromSheets() {
   try {
-    const url = API_URL + "?_=" + Date.now(); // ✅ anti-cache
+    const url = API_URL + "?token=" + encodeURIComponent(authToken) + "&_=" + Date.now(); // ✅ anti-cache
     const res = await fetch(url, { cache: "no-store" }); // ✅ anti-cache navigateur
 
     if (!res.ok) throw new Error("Sheets indisponible: " + res.status);
