@@ -19,6 +19,11 @@
     "Cimetière Pont": "#ff922b",
   };
 
+
+  function getAuthToken() {
+  return localStorage.getItem("token");
+}
+
   // =========================
   // GLOBAL STATE
   // =========================
@@ -71,6 +76,8 @@
 
 async function postToGAS(payload) {
   const params = new URLSearchParams();
+
+params.append("token", getAuthToken()); 
 
   Object.entries(payload || {}).forEach(([key, value]) => {
     if (value === undefined || value === null) return;
@@ -1308,7 +1315,11 @@ pendingPhotos = [];
 async function loadTreesFromSheets() {
   try {
     const url = API_URL + "?_=" + Date.now(); // ✅ anti-cache
-    const res = await fetch(url, { cache: "no-store" }); // ✅ anti-cache navigateur
+    const res = await fetch(
+  API_URL + "?token=" + getAuthToken() + "&_=" + Date.now(),
+  { cache: "no-store" }
+);
+ // ✅ anti-cache navigateur
 
     if (!res.ok) throw new Error("Sheets indisponible: " + res.status);
 
@@ -1348,6 +1359,31 @@ applyAgentMode();
   // START
   // =========================
   document.addEventListener("DOMContentLoaded", async () => {
+  const token = localStorage.getItem("token");
+
+if (!token) {
+  document.body.innerHTML = `
+    <div style="
+      height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:#0b1020;
+      color:#eef1ff;
+      font-family:system-ui;
+    ">
+      <div style="max-width:320px;text-align:center">
+        <h2>🔒 Accès sécurisé</h2>
+        <p>Connexion requise</p>
+        <button onclick="location.href='login.html'">
+          Se connecter
+        </button>
+      </div>
+    </div>
+  `;
+  throw new Error("Not authenticated");
+}
+
     // si Leaflet pas chargé => stop clair
     if (typeof L === "undefined") {
       console.error("Leaflet (L) n'est pas chargé.");
@@ -1455,34 +1491,11 @@ function getColorFromEtat(etat) {
 
 
   //------------- MDP-------------
-async function doLogin() {
-  const email = emailInput.value;
-  const password = passwordInput.value;
 
-  const res = await fetch(API_URL, {
-    method: "POST",
-    body: new URLSearchParams({
-      action: "login",
-      email,
-      password
-    })
-  });
-
-  const data = await res.json();
-
-  if (!data.ok) {
-    error.textContent = "Identifiants invalides";
-    return;
-  }
-
-  localStorage.setItem("token", data.token);
-  document.getElementById("login").style.display = "none";
-  initApp();
-}
 
 const token = localStorage.getItem("token");
 
-fetch(API_URL + "?token=" + token);
+
 
 if (user.role !== "admin") {
   // masquer boutons supprimer / exporter
