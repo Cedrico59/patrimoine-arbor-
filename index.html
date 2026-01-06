@@ -173,6 +173,21 @@
   filter: drop-shadow(0 4px 6px rgba(0,0,0,.35));
 }
 
+@keyframes pulseDanger {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.9;
+  }
+  70% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
 /* =========================
    MODE AGENT TERRAIN
 ========================= */
@@ -431,8 +446,7 @@ body.agent-mode button {
 <script src="https://unpkg.com/leaflet-pip@1.1.0/leaflet-pip.min.js" defer></script>
 
 <!-- ✅ TON JS -->
-<script src="app.js" defer></script>
-<script src="app.js?v=11" defer></script>
+
 <script src="app.js?v=12" defer></script>
 
 </body>

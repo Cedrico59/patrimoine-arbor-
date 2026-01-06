@@ -172,10 +172,24 @@ function createTreeIcon(color = "#4CAF50", etat = "") {
 
   let badge = "";
 
-  if (etat === "Dangereux (A abattre)") {
-    badge = `
-      <circle cx="46" cy="10" r="8" fill="#e53935" stroke="#000000ff" stroke-width="2"/>`;
-  }
+ if (etat === "Dangereux (A abattre)") {
+  badge = `
+    <!-- halo pulsant -->
+    <circle cx="46" cy="10" r="8"
+      fill="#e53935"
+      opacity="0.7"
+      style="animation: pulseDanger 1.8s infinite;"
+    />
+
+    <!-- pastille centrale -->
+    <circle cx="46" cy="10" r="6"
+      fill="#e53935"
+      stroke="#000000ff"
+      stroke-width="1.5"
+    />`;
+}
+
+
 
   if (etat === "A surveiller") {
     badge = `<circle cx="46" cy="10" r="8" fill="#fb8c00" stroke="#000000ff" stroke-width="2"/>`;
