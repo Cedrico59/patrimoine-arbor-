@@ -177,7 +177,7 @@ function createTreeIcon(color = "#4CAF50", etat = "") {
   <circle class="pulse-ring danger"
           cx="46" cy="10" r="10"
           fill="#e53935"
-          opacity="0.45"
+          opacity="0.75"
           style="transform-origin:46px 10px; transform-box:fill-box;" />
   <circle cx="46" cy="10" r="8" fill="#e53935" stroke="#000000ff" stroke-width="2"/>`;
 
