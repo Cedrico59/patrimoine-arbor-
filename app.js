@@ -380,7 +380,6 @@ small{color:#9db0ff}
   <p><b>ID :</b> ${escapeHtml(t.id)}</p>
   <p><b>Espèce :</b> ${escapeHtml(t.species || "—")}</p>
   <p><b>Secteur :</b> ${escapeHtml(t.secteur || "—")}</p>
-  <p><b>Quartier :</b> ${escapeHtml(t.quartier || "—")}</p>
   <p><b>Hauteur :</b> ${t.height ?? "—"} m</p>
   <p><b>Diamètre :</b> ${t.dbh ?? "—"} cm</p>
   <p><b>Adresse :</b> ${escapeHtml(t.address || "—")}</p>
