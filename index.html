@@ -172,12 +172,17 @@
   transform: scale(1.12);
   filter: drop-shadow(0 4px 6px rgba(0,0,0,.35));
 }
-
 .etat-pulse .pulse {
   transform-origin: center;
   transform-box: fill-box;
   animation: pulseDanger 1.6s ease-out infinite;
 }
+.pulse-ring.danger{
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pulseDanger 1.4s ease-out infinite;
+}
+
 
 @keyframes pulseDanger {
   0% {
