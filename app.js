@@ -199,9 +199,6 @@ function createTreeIcon(color = "#4CAF50", etat = "") {
           </radialGradient>
         </defs>
 
-        <!-- badge état -->
-        ${badge}
-
         <!-- feuillage -->
         <circle cx="32" cy="24" r="18" fill="url(#${g})"/>
         <circle cx="20" cy="30" r="14" fill="url(#${g})"/>
@@ -209,6 +206,9 @@ function createTreeIcon(color = "#4CAF50", etat = "") {
 
         <!-- tronc -->
         <rect x="28" y="38" width="8" height="18" rx="2" fill="#6D4C41"/>
+
+        <!-- ✅ badge ÉTAT AU-DESSUS -->
+        ${badge}
       </svg>
     `,
     iconSize: [44, 44],
