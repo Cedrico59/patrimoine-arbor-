@@ -151,7 +151,19 @@
 .tree-marker {
   z-index: 1000 !important;
   pointer-events: auto;
+
+  /* 🔥 correction */
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
 }
+
+/* sécurité supplémentaire */
+.tree-marker.leaflet-div-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
 
 /* =========================
    MODE AGENT TERRAIN
