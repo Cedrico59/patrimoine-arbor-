@@ -182,7 +182,7 @@ function createTreeIcon(color = "#4CAF50", etat = "") {
     />
 
     <!-- pastille centrale -->
-    <circle cx="46" cy="10" r="6"
+    <circle cx="46" cy="10" r="8"
       fill="#e53935"
       stroke="#000000ff"
       stroke-width="1.5"
