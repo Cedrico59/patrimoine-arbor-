@@ -30,6 +30,8 @@
   let selectedId = null;
   let lastDeletedTree = null;
   let pendingPhotos = [];
+let authToken = sessionStorage.getItem("authToken");
+let isAuthenticated = !!authToken;
 
 
   const markers = new Map(); // id -> marker
@@ -70,7 +72,12 @@
   // =========================
 
 async function postToGAS(payload) {
+  if (!authToken) {
+    throw new Error("Non authentifié");
+  }
+
   const params = new URLSearchParams();
+  params.append("token", authToken);
 
   Object.entries(payload || {}).forEach(([key, value]) => {
     if (value === undefined || value === null) return;
@@ -89,6 +96,7 @@ async function postToGAS(payload) {
     return { ok: false, raw: text };
   }
 }
+
 
 
   
@@ -1347,35 +1355,59 @@ applyAgentMode();
   // =========================
   // START
   // =========================
-  document.addEventListener("DOMContentLoaded", async () => {
-    // si Leaflet pas chargé => stop clair
-    if (typeof L === "undefined") {
-      console.error("Leaflet (L) n'est pas chargé.");
-      alert("Leaflet ne s'est pas chargé. Vérifie la connexion / scripts.");
-      return;
-    }
 
-    // charge stockage
-    await loadTreesFromSheets();
+// =========================
+// START
+// =========================
+// =========================
+// START
+// =========================
+document.addEventListener("DOMContentLoaded", async () => {
+  if (!isAuthenticated) {
+    document.getElementById("loginOverlay").style.display = "flex";
+    return;
+  }
 
+  await startApp();
+});
 
-    // init
-    initMap();
-    addLegendToMap();
-    wireUI();
+async function startApp() {
+  // si Leaflet pas chargé => stop clair
+  if (typeof L === "undefined") {
+    console.error("Leaflet (L) n'est pas chargé.");
+    alert("Leaflet ne s'est pas chargé. Vérifie la connexion / scripts.");
+    return;
+  }
 
-    // layers
-    await loadQuartiersGeoJSON();
-    await loadCityContourAndLock();
+  await loadTreesFromSheets();
 
-    // render
-    renderMarkers();
-    renderList();
-    renderSecteurCount();
-    setSelected(null);
+  initMap();
+  addLegendToMap();
+  wireUI();
 
-    console.log("✅ App chargée (A+B+C+D).");
-  });
+  await loadQuartiersGeoJSON();
+  await loadCityContourAndLock();
+
+  renderMarkers();
+  renderList();
+  renderSecteurCount();
+  setSelected(null);
+
+  console.log("✅ App chargée (auth OK).");
+}
+async function startApp() {
+  await loadTreesFromSheets();
+  initMap();
+  addLegendToMap();
+  wireUI();
+  await loadQuartiersGeoJSON();
+  await loadCityContourAndLock();
+  renderMarkers();
+  renderList();
+  renderSecteurCount();
+  setSelected(null);
+}
+
 
   let carouselIndex = 0;
 let carouselPhotos = [];
@@ -1452,6 +1484,39 @@ function getColorFromEtat(etat) {
   }
 }
 
+document.getElementById("loginBtn")?.addEventListener("click", async () => {
+  const pwd = document.getElementById("passwordInput").value;
+  const err = document.getElementById("loginError");
+
+  err.textContent = "";
+
+  try {
+    const res = await fetch(API_URL, {
+      method: "POST",
+      body: new URLSearchParams({
+        action: "login",
+        password: pwd
+      })
+    });
+
+    const data = await res.json();
+
+    if (!data.ok) {
+      err.textContent = "Mot de passe incorrect";
+      return;
+    }
+
+    authToken = data.token;
+    sessionStorage.setItem("authToken", authToken);
+    isAuthenticated = true;
+
+    document.getElementById("loginOverlay").style.display = "none";
+    startApp();
+
+  } catch (e) {
+    err.textContent = "Erreur de connexion";
+  }
+});
 
 
 })();
