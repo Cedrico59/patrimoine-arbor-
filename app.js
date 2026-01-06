@@ -167,50 +167,36 @@ await loadTreesFromSheets();
   // =========================
   // ICONS / COLORS
   // =========================
-function createTreeIcon(color = "#4CAF50", etat = "", scale = 1) {
-  const size = 44 * scale;
-  const anchorX = size / 2;
-  const anchorY = size;
-
+function createTreeIcon(color = "#4CAF50", etat = "") {
   const g = "g_" + Math.random().toString(36).slice(2);
 
   let badge = "";
 
-  if (etat === "Dangereux (A abattre)") {
-    badge = `
-      <circle class="pulse-ring danger"
-        cx="46" cy="10" r="8"
-        fill="#e53935"/>
-      <circle
-        cx="46" cy="10" r="8"
-        fill="#e53935"
-        stroke="#000"
-        stroke-width="2"/>
-    `;
-  }
+ if (etat === "Dangereux (A abattre)") {
+ badge = `
+  <circle class="pulse-ring danger"
+          cx="46" cy="11" r="8"
+          fill="#e53935"
+          opacity="0.75"
+          style="transform-origin:46px 10px; transform-box:fill-box;" />
+  <circle cx="46" cy="10" r="8" fill="#e53935" stroke="#000000ff" stroke-width="2"/>`;
+
+}
+
+
 
   if (etat === "A surveiller") {
-    badge = `
-      <circle cx="46" cy="10" r="7"
-        fill="#fb8c00"
-        stroke="#000"
-        stroke-width="2"/>
-    `;
+    badge = `<circle cx="46" cy="10" r="8" fill="#fb8c00" stroke="#000000ff" stroke-width="2"/>`;
   }
 
   if (etat === "A élaguer") {
-    badge = `
-      <circle cx="46" cy="10" r="7"
-        fill="#43a047"
-        stroke="#000"
-        stroke-width="2"/>
-    `;
+    badge = `<circle cx="46" cy="10" r="8" fill="#43a047" stroke="#000000ff" stroke-width="2"/>`;
   }
 
   return L.divIcon({
     className: "tree-marker",
     html: `
-      <svg width="${size}" height="${size}" viewBox="0 0 64 64">
+      <svg width="44" height="44" viewBox="0 0 64 64">
         <defs>
           <radialGradient id="${g}" cx="50%" cy="35%" r="60%">
             <stop offset="0%" stop-color="#b7f7c2"/>
@@ -226,24 +212,16 @@ function createTreeIcon(color = "#4CAF50", etat = "", scale = 1) {
         <!-- tronc -->
         <rect x="28" y="38" width="8" height="18" rx="2" fill="#6D4C41"/>
 
-        <!-- badge état -->
+        <!-- ✅ badge ÉTAT AU-DESSUS -->
         ${badge}
       </svg>
     `,
-    iconSize: [size, size],
-    iconAnchor: [anchorX, anchorY],
-    popupAnchor: [0, -size + 8],
+    iconSize: [44, 44],
+    iconAnchor: [22, 42],
+    popupAnchor: [0, -36],
   });
 }
 
-
-function getTreeIconScale(zoom) {
-  if (zoom >= 17) return 1;     // zoom proche
-  if (zoom >= 16) return 0.9;
-  if (zoom >= 15) return 0.8;
-  if (zoom >= 14) return 0.7;
-  return 0.6;                  // zoom éloigné
-}
 
 
 
@@ -823,13 +801,9 @@ renderTreePreview(t);
 function addOrUpdateMarker(t) {
   let m = markers.get(t.id);
 
-  const zoom = map.getZoom();
-  const scale = getTreeIconScale(zoom);
-
   const icon = createTreeIcon(
     getColorFromSecteur(t.secteur),
-    t.etat,
-    scale
+    t.etat
   );
 
   if (!m) {
@@ -846,7 +820,6 @@ function addOrUpdateMarker(t) {
     m.setIcon(icon);
   }
 }
-
 
 
 
@@ -986,8 +959,6 @@ function locateUserGPS() {
   // INIT
   // =========================
   function initMap() {
-  
-
     map = L.map("map", {
       zoomControl: true,
       minZoom: 13,
@@ -1033,9 +1004,7 @@ function handleMapSelect(e) {
 // 👇 IMPORTANT : PC + MOBILE
 map.on("click", handleMapSelect);
 map.on("tap", handleMapSelect);
- map.on("zoomend", () => {
-  renderMarkers(); // recrée les icônes à la bonne taille
-});
+
   }
 
   function wireUI() {
