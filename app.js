@@ -174,18 +174,15 @@ function createTreeIcon(color = "#4CAF50", etat = "") {
 
   if (etat === "Dangereux (A abattre)") {
     badge = `
-      <circle cx="46" cy="10" r="7" fill="#e53935" stroke="#fff" stroke-width="2"/>
-      <line x1="42" y1="6" x2="50" y2="14" stroke="#fff" stroke-width="2"/>
-      <line x1="50" y1="6" x2="42" y2="14" stroke="#fff" stroke-width="2"/>
-    `;
+      <circle cx="46" cy="10" r="8" fill="#e53935" stroke="#000000ff" stroke-width="2"/>`;
   }
 
   if (etat === "A surveiller") {
-    badge = `<circle cx="46" cy="10" r="7" fill="#fb8c00" stroke="#fff" stroke-width="2"/>`;
+    badge = `<circle cx="46" cy="10" r="8" fill="#fb8c00" stroke="#000000ff" stroke-width="2"/>`;
   }
 
   if (etat === "A élaguer") {
-    badge = `<circle cx="46" cy="10" r="7" fill="#43a047" stroke="#fff" stroke-width="2"/>`;
+    badge = `<circle cx="46" cy="10" r="8" fill="#43a047" stroke="#000000ff" stroke-width="2"/>`;
   }
 
   return L.divIcon({
