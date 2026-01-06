@@ -356,7 +356,7 @@ function addLegendToMap() {
 
   // IMPORTANT: pour que onclick="openTreeInNewTab()" marche depuis HTML
   window.openTreeInNewTab = function () {
-    
+    if (!selectedId) return;
     const t = getTreeById(selectedId);
     if (!t) return;
 
@@ -494,7 +494,7 @@ del.onclick = async () => {
   }
 
   // 📦 PHOTO DÉJÀ ENREGISTRÉE (Drive)
-
+  if (!selectedId) return;
   if (!confirm("Supprimer cette photo ?")) return;
 
   const t = getTreeById(selectedId);
@@ -1068,15 +1068,8 @@ galleryInput.addEventListener("change", async () => {
   galleryInput.value = ""; // reset
 
   updatePhotoStatus();
-  const t = selectedId ? getTreeById(selectedId) : null;
-const allPhotos = [
-  ...(t?.photos || []),
-  ...pendingPhotos
-];
-
-renderGallery(allPhotos);
-renderPhotoCarousel(allPhotos);
-
+  renderGallery(pendingPhotos);
+  renderPhotoCarousel(pendingPhotos);
 
 });
 
@@ -1171,7 +1164,7 @@ if (toggleListBtn && treeListWrapper) {
     };
 
  deleteBtn().onclick = async () => {
-  
+  if (!selectedId) return;
   if (!confirm("Supprimer cet arbre ?")) return;
 
   const t = getTreeById(selectedId);
