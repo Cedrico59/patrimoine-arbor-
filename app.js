@@ -167,8 +167,26 @@ await loadTreesFromSheets();
   // =========================
   // ICONS / COLORS
   // =========================
-function createTreeIcon(color = "#4CAF50") {
+function createTreeIcon(color = "#4CAF50", etat = "") {
   const g = "g_" + Math.random().toString(36).slice(2);
+
+  let badge = "";
+
+  if (etat === "Dangereux (A abattre)") {
+    badge = `
+      <circle cx="46" cy="10" r="7" fill="#e53935" stroke="#fff" stroke-width="2"/>
+      <line x1="42" y1="6" x2="50" y2="14" stroke="#fff" stroke-width="2"/>
+      <line x1="50" y1="6" x2="42" y2="14" stroke="#fff" stroke-width="2"/>
+    `;
+  }
+
+  if (etat === "A surveiller") {
+    badge = `<circle cx="46" cy="10" r="7" fill="#fb8c00" stroke="#fff" stroke-width="2"/>`;
+  }
+
+  if (etat === "A élaguer") {
+    badge = `<circle cx="46" cy="10" r="7" fill="#43a047" stroke="#fff" stroke-width="2"/>`;
+  }
 
   return L.divIcon({
     className: "tree-marker",
@@ -181,49 +199,29 @@ function createTreeIcon(color = "#4CAF50") {
           </radialGradient>
         </defs>
 
+        <!-- badge état -->
+        ${badge}
+
         <!-- feuillage -->
-        <circle cx="32" cy="22" r="18" fill="url(#${g})"/>
-        <circle cx="20" cy="28" r="14" fill="url(#${g})"/>
-        <circle cx="44" cy="28" r="14" fill="url(#${g})"/>
+        <circle cx="32" cy="24" r="18" fill="url(#${g})"/>
+        <circle cx="20" cy="30" r="14" fill="url(#${g})"/>
+        <circle cx="44" cy="30" r="14" fill="url(#${g})"/>
 
         <!-- tronc -->
-        <rect x="28" y="36" width="8" height="18" rx="2" fill="#6D4C41"/>
+        <rect x="28" y="38" width="8" height="18" rx="2" fill="#6D4C41"/>
       </svg>
     `,
     iconSize: [44, 44],
-    iconAnchor: [6, 6],
-    popupAnchor: [0, -38],
+    iconAnchor: [22, 42],
+    popupAnchor: [0, -36],
   });
 }
 
 
 
 
-function createEtatBadgeIcon(etat) {
-  if (!etat) return null;
 
-  let color = null;
 
-  if (etat === "Dangereux (A abattre)") color = "#e53935";
-  if (etat === "A surveiller") color = "#fb8c00";
-  if (etat === "A élaguer") color = "#43a047";
-
-  if (!color) return null;
-
-  return L.divIcon({
-    className: "etat-badge",
-    html: `<div style="
-      width:12px;
-      height:12px;
-      border-radius:50%;
-      background:${color};
-      border:2px solid white;
-      box-shadow:0 0 3px rgba(0,0,0,0.6);
-    "></div>`,
-    iconSize: [12, 12],
-    iconAnchor: [6, 18], // 👈 AU-DESSUS de l’arbre
-  });
-}
 
 
 
@@ -795,16 +793,16 @@ renderTreePreview(t);
   // MAP + LAYERS
   // =========================
 
-
 function addOrUpdateMarker(t) {
-
-  // 🌳 marqueur arbre principal (INCHANGÉ)
   let m = markers.get(t.id);
 
+  const icon = createTreeIcon(
+    getColorFromSecteur(t.secteur),
+    t.etat
+  );
+
   if (!m) {
-    m = L.marker([t.lat, t.lng], {
-      icon: createTreeIcon(getColorFromSecteur(t.secteur)),
-    }).addTo(map);
+    m = L.marker([t.lat, t.lng], { icon }).addTo(map);
 
     m.on("click", () => {
       setSelected(t.id);
@@ -814,25 +812,11 @@ function addOrUpdateMarker(t) {
     markers.set(t.id, m);
   } else {
     m.setLatLng([t.lat, t.lng]);
-    m.setIcon(createTreeIcon(getColorFromSecteur(t.secteur)));
-  }
-
-  // 🔴🟠🟢 supprimer ancien badge
-  if (m._etatBadge) {
-    map.removeLayer(m._etatBadge);
-    m._etatBadge = null;
-  }
-
-  // 🔴🟠🟢 ajouter badge si état défini
-  const badgeIcon = createEtatBadgeIcon(t.etat);
-  if (badgeIcon) {
-    m._etatBadge = L.marker([t.lat, t.lng], {
-      icon: badgeIcon,
-      interactive: false,
-      zIndexOffset: 1000
-    }).addTo(map);
+    m.setIcon(icon);
   }
 }
+
+
 
 
   function removeMarker(id) {
