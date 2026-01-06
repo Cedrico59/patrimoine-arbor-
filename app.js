@@ -167,24 +167,33 @@ await loadTreesFromSheets();
   // =========================
   // ICONS / COLORS
   // =========================
- function createTreeIcon(color = "#4CAF50", etat = "") {
-  return L.divIcon({
-    className: "tree-marker",
-    html: `
-      <svg width="42" height="42" viewBox="0 0 64 64">
-        <!-- 🌳 ARBRE (INCHANGÉ) -->
-        <circle cx="32" cy="26" r="20" fill="${color}"/>
-        <rect x="28" y="38" width="8" height="18" rx="2" fill="#6D4C41"/>
+function createEtatBadgeIcon(etat) {
+  if (!etat) return null;
 
-        <!-- 🚨 BADGE ÉTAT -->
-        ${renderEtatBadge(etat)}
-      </svg>
-    `,
-    iconSize: [42, 42],
-    iconAnchor: [21, 40],
-    popupAnchor: [0, -36],
+  let color = null;
+
+  if (etat === "Dangereux (A abattre)") color = "#e53935";
+  if (etat === "A surveiller") color = "#fb8c00";
+  if (etat === "A élaguer") color = "#43a047";
+
+  if (!color) return null;
+
+  return L.divIcon({
+    className: "etat-badge",
+    html: `<div style="
+      width:12px;
+      height:12px;
+      border-radius:50%;
+      background:${color};
+      border:2px solid white;
+      box-shadow:0 0 3px rgba(0,0,0,0.6);
+    "></div>`,
+    iconSize: [12, 12],
+    iconAnchor: [6, 18], // 👈 AU-DESSUS de l’arbre
   });
 }
+
+
 
 
 
@@ -753,52 +762,44 @@ renderTreePreview(t);
   // =========================
   // MAP + LAYERS
   // =========================
-  function addOrUpdateMarker(t) {
-    const label = t.species ? t.species : "Arbre";
-    const subtitle = t.address ? `— ${t.address}` : "";
-    const tags = (t.tags || []).slice(0, 3).join(", ");
+function addOrUpdateMarker(t) {
 
-    const popupHtml =
-      `<b>${escapeHtml(label)}</b> ${escapeHtml(subtitle)}<br/>` +
-      `<small>Secteur : ${escapeHtml(t.secteur || "—")} • Quartier : ${escapeHtml(t.quartier || "—")}</small><br/>` +
-      `<small>${escapeHtml(tags ? "Tags: " + tags : "Cliquer pour ouvrir la fiche")}</small>`;
+  // 🌳 marqueur arbre principal (INCHANGÉ)
+  let m = markers.get(t.id);
 
-    if (markers.has(t.id)) {
-      const m = markers.get(t.id);
-      m.setLatLng([t.lat, t.lng]);
-     const etatColor = getColorFromEtat(t.etat);
-const color = etatColor || getColorFromSecteur(t.secteur);
-m.setIcon(createTreeIcon(
-  getColorFromSecteur(t.secteur),
-  t.etat
-));
+  if (!m) {
+    m = L.marker([t.lat, t.lng], {
+      icon: createTreeIcon(getColorFromSecteur(t.secteur)),
+    }).addTo(map);
 
-
-      m.bindPopup(popupHtml);
-      return;
-    }
-
-    const etatColor = getColorFromEtat(t.etat);
-const color = etatColor || getColorFromSecteur(t.secteur);
-
-const m = L.marker([t.lat, t.lng], {
-  icon: createTreeIcon(
-  getColorFromSecteur(t.secteur),
-  t.etat
-),
-
-}).addTo(map);
-
-
-
-    m.bindPopup(popupHtml);
     m.on("click", () => {
       setSelected(t.id);
       highlightListSelection();
     });
 
     markers.set(t.id, m);
+  } else {
+    m.setLatLng([t.lat, t.lng]);
+    m.setIcon(createTreeIcon(getColorFromSecteur(t.secteur)));
   }
+
+  // 🔴🟠🟢 supprimer ancien badge
+  if (m._etatBadge) {
+    map.removeLayer(m._etatBadge);
+    m._etatBadge = null;
+  }
+
+  // 🔴🟠🟢 ajouter badge si état défini
+  const badgeIcon = createEtatBadgeIcon(t.etat);
+  if (badgeIcon) {
+    m._etatBadge = L.marker([t.lat, t.lng], {
+      icon: badgeIcon,
+      interactive: false,
+      zIndexOffset: 1000
+    }).addTo(map);
+  }
+}
+
 
   function removeMarker(id) {
     const m = markers.get(id);
@@ -1421,29 +1422,6 @@ function getColorFromEtat(etat) {
   }
 }
 
-function renderEtatBadge(etat) {
-  if (!etat) return "";
 
-  if (etat === "Dangereux (A abattre") {
-    // 🔴 croix rouge
-    return `
-      <circle cx="48" cy="16" r="8" fill="#e53935" stroke="#fff" stroke-width="2"/>
-      <line x1="44" y1="12" x2="52" y2="20" stroke="#fff" stroke-width="2"/>
-      <line x1="52" y1="12" x2="44" y2="20" stroke="#fff" stroke-width="2"/>
-    `;
-  }
-
-  if (etat === "A surveiller") {
-    // 🟠 pastille orange
-    return `<circle cx="48" cy="16" r="8" fill="#fb8c00" stroke="#fff" stroke-width="2"/>`;
-  }
-
-  if (etat === "A élaguer") {
-    // 🟢 pastille verte
-    return `<circle cx="48" cy="16" r="8" fill="#43a047" stroke="#fff" stroke-width="2"/>`;
-  }
-
-  return "";
-}
 
 })();
