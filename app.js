@@ -986,9 +986,7 @@ function locateUserGPS() {
   // INIT
   // =========================
   function initMap() {
-    map.on("zoomend", () => {
-  renderMarkers(); // recrée les icônes à la bonne taille
-});
+  
 
     map = L.map("map", {
       zoomControl: true,
@@ -1035,7 +1033,9 @@ function handleMapSelect(e) {
 // 👇 IMPORTANT : PC + MOBILE
 map.on("click", handleMapSelect);
 map.on("tap", handleMapSelect);
-
+ map.on("zoomend", () => {
+  renderMarkers(); // recrée les icônes à la bonne taille
+});
   }
 
   function wireUI() {
