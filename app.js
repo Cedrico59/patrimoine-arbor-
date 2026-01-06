@@ -167,30 +167,28 @@ await loadTreesFromSheets();
   // =========================
   // ICONS / COLORS
   // =========================
- function createTreeIcon(color = "#4CAF50") {
-    const gradientId = "g_" + Math.random().toString(36).slice(2);
+function createTreeIcon(color = "#4CAF50") {
+  return L.divIcon({
+    className: "tree-marker",
+    html: `
+      <svg width="44" height="56" viewBox="0 0 44 56" xmlns="http://www.w3.org/2000/svg">
+        <!-- Pin -->
+        <path d="M22 0C10 0 0 10 0 22c0 16.5 22 34 22 34s22-17.5 22-34C44 10 34 0 22 0z"
+              fill="${color}" />
 
-    return L.divIcon({
-      className: "tree-marker",
-      html: `
-        <svg width="42" height="42" viewBox="0 0 64 64">
-          <defs>
-            <radialGradient id="${gradientId}" cx="50%" cy="40%" r="50%">
-              <stop offset="0%" stop-color="#7CFC90"/>
-              <stop offset="100%" stop-color="${color}"/>
-            </radialGradient>
-          </defs>
-          <circle cx="32" cy="26" r="20" fill="url(#${gradientId})"/>
-          <circle cx="22" cy="30" r="14" fill="url(#${gradientId})" opacity="0.9"/>
-          <circle cx="42" cy="30" r="14" fill="url(#${gradientId})" opacity="0.9"/>
-          <rect x="28" y="38" width="8" height="18" rx="2" fill="#6D4C41"/>
-        </svg>
-      `,
-      iconSize: [42, 42],
-      iconAnchor: [21, 40],
-      popupAnchor: [0, -36],
-    });
-  }
+        <!-- Arbre -->
+        <circle cx="22" cy="18" r="8" fill="#66bb6a"/>
+        <circle cx="17" cy="21" r="6" fill="#5fa85d"/>
+        <circle cx="27" cy="21" r="6" fill="#5fa85d"/>
+        <rect x="20" y="26" width="4" height="10" rx="1" fill="#6D4C41"/>
+      </svg>
+    `,
+    iconSize: [44, 56],
+    iconAnchor: [22, 56],
+    popupAnchor: [0, -48],
+  });
+}
+
 
 
 function createEtatBadgeIcon(etat) {
