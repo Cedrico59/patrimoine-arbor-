@@ -175,7 +175,7 @@ function createTreeIcon(color = "#4CAF50", etat = "") {
  if (etat === "Dangereux (A abattre)") {
  badge = `
   <circle class="pulse-ring danger"
-          cx="46" cy="10" r="10"
+          cx="10" cy="10" r="10"
           fill="#e53935"
           opacity="0.55"
           style="transform-origin:46px 10px; transform-box:fill-box;" />
