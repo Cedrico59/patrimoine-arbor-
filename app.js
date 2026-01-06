@@ -469,42 +469,47 @@ if (!p.driveId && p.url) {
   }
 }
 
-      const del = document.createElement("button");
-      del.className = "danger";
-      del.textContent = "Retirer";
-      del.onclick = async () => {
+    const del = document.createElement("button");
+del.className = "danger";
+del.textContent = "Retirer";
+
+del.onclick = async () => {
+  const photo = photos[idx];
+
+  // 🕓 PHOTO TEMPORAIRE (pas encore enregistrée)
+  if (!photo.driveId) {
+    pendingPhotos = pendingPhotos.filter(p => p.id !== photo.id);
+
+    updatePhotoStatus();
+
+    const t = selectedId ? getTreeById(selectedId) : null;
+    const allPhotos = [
+      ...(t?.photos || []),
+      ...pendingPhotos
+    ];
+
+    renderGallery(allPhotos);
+    renderPhotoCarousel(allPhotos);
+    return;
+  }
+
+  // 📦 PHOTO DÉJÀ ENREGISTRÉE (Drive)
   if (!selectedId) return;
   if (!confirm("Supprimer cette photo ?")) return;
 
   const t = getTreeById(selectedId);
   if (!t) return;
 
-  const photo = photos[idx];
+  await postToGAS({
+    action: "deletePhoto",
+    treeId: t.id,
+    photoDriveId: photo.driveId
+  });
 
-  // sécurité : il faut un driveId
-  if (!photo.driveId) {
-    alert("Impossible de supprimer cette photo (ID Drive manquant)");
-    return;
-  }
-
-  // 🔗 suppression serveur (Drive + Sheets)
-
-
-await postToGAS({
-  action: "deletePhoto",
-  treeId: t.id,
-  photoDriveId: photo.driveId
-});
-
-
-
-  // 🔁 RECHARGER LA VÉRITÉ (Sheets)
   await loadTreesFromSheets();
-
-  // 🔄 réafficher l’arbre sélectionné
-  
   persistAndRefresh(t.id);
 };
+
 
 
       meta.appendChild(span);
