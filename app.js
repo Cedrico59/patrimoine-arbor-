@@ -191,7 +191,7 @@ function createTreeIcon(color = "#4CAF50") {
       </svg>
     `,
     iconSize: [44, 44],
-    iconAnchor: [22, 42],
+    iconAnchor: [6, 6],
     popupAnchor: [0, -38],
   });
 }
