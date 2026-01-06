@@ -1454,4 +1454,38 @@ function getColorFromEtat(etat) {
 
 
 
+  //------------- MDP-------------
+async function doLogin() {
+  const email = emailInput.value;
+  const password = passwordInput.value;
+
+  const res = await fetch(API_URL, {
+    method: "POST",
+    body: new URLSearchParams({
+      action: "login",
+      email,
+      password
+    })
+  });
+
+  const data = await res.json();
+
+  if (!data.ok) {
+    error.textContent = "Identifiants invalides";
+    return;
+  }
+
+  localStorage.setItem("token", data.token);
+  document.getElementById("login").style.display = "none";
+  initApp();
+}
+
+const token = localStorage.getItem("token");
+
+fetch(API_URL + "?token=" + token);
+
+if (user.role !== "admin") {
+  // masquer boutons supprimer / exporter
+}
+
 })();
