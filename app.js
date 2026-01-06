@@ -346,7 +346,6 @@ function addLegendToMap() {
     el("p-id").textContent = t.id || "—";
     el("p-species").textContent = t.species || "—";
     el("p-secteur").textContent = t.secteur || "—";
-    el("p-quartier").textContent = t.quartier || "—";
     el("p-height").textContent = t.height ?? "—";
     el("p-dbh").textContent = t.dbh ?? "—";
     el("p-address").textContent = t.address || "—";
