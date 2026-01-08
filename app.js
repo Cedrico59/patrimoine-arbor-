@@ -67,6 +67,16 @@ let isAuthenticated = !!authToken;
   const importBtn = () => el("importBtn");
   const importFile = () => el("importFile");
 
+  const dateDemandeEl = () => el("dateDemande");
+const natureTravauxEl = () => el("natureTravaux");
+const dateDemandeDevisEl = () => el("dateDemandeDevis");
+const devisNumeroEl = () => el("devisNumero");
+const montantDevisEl = () => el("montantDevis");
+const dateExecutionEl = () => el("dateExecution");
+const remarquesTravauxEl = () => el("remarquesTravaux");
+const numeroBDCEl = () => el("numeroBDC");
+const numeroFactureEl = () => el("numeroFacture");
+
   // =========================
   // UTIL
   // =========================
@@ -806,7 +816,18 @@ pendingPhotos = [];
     addressEl().value = t.address || "";
     tagsEl().value = (t.tags || []).join(", ");
     etatEl().value = t.etat || "";
+    dateDemandeEl().value = t.dateDemande || "";
+    natureTravauxEl().value = t.natureTravaux || "";
+    dateDemandeDevisEl().value = t.dateDemandeDevis || "";
+    devisNumeroEl().value = t.devisNumero || "";
+    montantDevisEl().value = t.montantDevis || "";
+    dateExecutionEl().value = t.dateExecution || "";
+    remarquesTravauxEl().value = t.remarquesTravaux || "";
+    numeroBDCEl().value = t.numeroBDC || "";
+    numeroFactureEl().value = t.numeroFacture || "";
+
     commentEl().value = t.comment || "";
+
 
   // ⚠️ Affichage des photos UNIQUEMENT si arbre déjà enregistré
 if (t.photos && t.photos.length > 0) {
@@ -1270,6 +1291,16 @@ if (selectedId) {
   t.address = addressEl().value.trim();
   t.tags = normalizeTags(tagsEl().value);
   t.etat = etatEl().value || "";
+  t.dateDemande = dateDemandeEl().value;
+  t.natureTravaux = natureTravauxEl().value.trim();
+  t.dateDemandeDevis = dateDemandeDevisEl().value;
+  t.devisNumero = devisNumeroEl().value.trim();
+  t.montantDevis = montantDevisEl().value;
+  t.dateExecution = dateExecutionEl().value;
+  t.remarquesTravaux = remarquesTravauxEl().value.trim();
+  t.numeroBDC = numeroBDCEl().value.trim();
+  t.numeroFacture = numeroFactureEl().value.trim();
+
   t.comment = commentEl().value.trim();
 
   // 🔥 photos : fusion définitive
@@ -1542,6 +1573,25 @@ document.getElementById("loginBtn")?.addEventListener("click", async () => {
     err.textContent = "Erreur de connexion";
   }
 });
+
+
+//---------Tableau élagage---------------
+
+// dans l'objet t (tree)
+t.travaux = [
+  {
+    id: crypto.randomUUID(),
+    dateDemande: "",
+    natureTravaux: "",
+    dateDemandeDevis: "",
+    devisNumero: "",
+    montantDevis: "",
+    dateExecution: "",
+    remarques: "",
+    numeroBDC: "",
+    numeroFacture: ""
+  }
+];
 
 
 })();
