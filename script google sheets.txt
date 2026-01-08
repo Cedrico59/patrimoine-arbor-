@@ -4,11 +4,46 @@ function TEST_DRIVE_LINKED() {
   DriveApp.createFile("test_linked_drive.txt", "OK");
 }
 
+/* =========================
+   🔐 AUTH (AJOUT)
+========================= */
+const APP_PASSWORD = "marcq2026"; // 🔥 mets ton mot de passe ici
+const TOKEN_STORE = PropertiesService.getScriptProperties();
+const TOKEN_TTL_MS = 1000 * 60 * 60 * 12; // 12h
+
+function createToken_() {
+  const token = Utilities.getUuid();
+  TOKEN_STORE.setProperty(token, String(Date.now()));
+  return token;
+}
+
+function isValidToken_(token) {
+  if (!token) return false;
+  const ts = TOKEN_STORE.getProperty(token);
+  if (!ts) return false;
+
+  const age = Date.now() - Number(ts);
+  if (!Number.isFinite(age) || age > TOKEN_TTL_MS) {
+    TOKEN_STORE.deleteProperty(token);
+    return false;
+  }
+  return true;
+}
+
+function authFail_() {
+  return jsonResponse({ ok: false, error: "unauthorized" });
+}
+
 
 /* =========================
    GET – LECTURE DES ARBRES
+   (MODIF: ajout auth + param e)
 ========================= */
-function doGet() {
+function doGet(e) {
+  // 🔐 AUTH
+  const token = e?.parameter?.token;
+  if (!isValidToken_(token)) return authFail_();
+
   const sheet = SpreadsheetApp
     .openById(SPREADSHEET_ID)
     .getSheetByName("Patrimoine_arboré");
@@ -49,18 +84,16 @@ function doGet() {
           catch (e) { return []; }
         })(),
 
-        
+        // ✅ tu lisais déjà row[13], donc on le garde
         updatedAt: row[13] ? Number(row[13]) : null
       };
     })
-    // sécurité : seulement les arbres valides
     .filter(t => t.id && Number.isFinite(t.lat) && Number.isFinite(t.lng));
 
   return ContentService
     .createTextOutput(JSON.stringify(trees))
     .setMimeType(ContentService.MimeType.JSON);
 }
-
 
 /* =========================
    DRIVE
@@ -90,18 +123,35 @@ function uploadPhoto(base64, filename, treeId) {
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 
   return {
-  driveId: file.getId(),   // ⭐ CRITIQUE
-  url: file.getUrl(),
-  name: filename,
-  addedAt: Date.now()
-};
+    driveId: file.getId(), // ⭐ CRITIQUE
+    url: file.getUrl(),
+    name: filename,
+    addedAt: Date.now()
+  };
 }
 
 /* =========================
-   POST – CREATE / UPDATE / DELETE
+   POST – LOGIN / CREATE / UPDATE / DELETE
+   (MODIF: ajout login + auth)
 ========================= */
 function doPost(e) {
   try {
+    // 🔐 LOGIN (action=login & password=...)
+    const actionParam = e?.parameter?.action;
+    if (actionParam === "login") {
+      const pwd = e?.parameter?.password || "";
+      if (pwd !== APP_PASSWORD) return authFail_();
+
+      const token = createToken_();
+      return ContentService
+        .createTextOutput(JSON.stringify({ ok: true, token }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 🔐 AUTH obligatoire pour tout le reste
+    const token = e?.parameter?.token;
+    if (!isValidToken_(token)) return authFail_();
+
     let data = {};
 
     // ✅ Accepte :
@@ -123,6 +173,12 @@ function doPost(e) {
 
     // ✅ si on reçoit { payload: {...} }
     if (data && data.payload) data = data.payload;
+
+    // (optionnel) on ne garde pas token/password dans data pour éviter effets de bord
+    if (data && typeof data === "object") {
+      delete data.token;
+      delete data.password;
+    }
 
     const sheet = SpreadsheetApp
       .openById(SPREADSHEET_ID)
@@ -186,10 +242,12 @@ function doPost(e) {
 
     // ✅ conversions si on est passé par e.parameter (tout est string)
     if (typeof data.tags === "string") {
-      try { data.tags = JSON.parse(data.tags); } catch { data.tags = String(data.tags).split(",").map(s => s.trim()).filter(Boolean); }
+      try { data.tags = JSON.parse(data.tags); }
+      catch { data.tags = String(data.tags).split(",").map(s => s.trim()).filter(Boolean); }
     }
     if (typeof data.photos === "string") {
-      try { data.photos = JSON.parse(data.photos); } catch { data.photos = []; }
+      try { data.photos = JSON.parse(data.photos); }
+      catch { data.photos = []; }
     }
 
     /* ===== PHOTOS EXISTANTES ===== */
@@ -218,7 +276,9 @@ function doPost(e) {
 
     const allPhotos = existingPhotos.concat(uploadedPhotos);
 
-    /* ===== DONNÉES ===== */
+    /* ===== DONNÉES =====
+       ✅ Ajout updatedAt (col 14) pour correspondre à ton doGet row[13]
+    */
     const rowData = [
       new Date(),
       data.id || "",
@@ -232,8 +292,8 @@ function doPost(e) {
       (data.tags || []).join(","),
       data.comment || "",
       JSON.stringify(allPhotos),
-      data.etat || ""
-
+      data.etat || "",
+      data.updatedAt || Date.now()
     ];
 
     /* ===== UPDATE ===== */
@@ -252,7 +312,7 @@ function doPost(e) {
     /* ===== CREATE ===== */
     sheet.appendRow(rowData);
     const newRow = sheet.getLastRow();
-colorRowByEtat(sheet, newRow, data.etat);
+    colorRowByEtat(sheet, newRow, data.etat);
     SpreadsheetApp.flush();
     return ok({ status: "CREATED", photos: allPhotos });
 
@@ -263,8 +323,6 @@ colorRowByEtat(sheet, newRow, data.etat);
   }
 }
 
-
-
 /* =========================
    UTIL
 ========================= */
@@ -273,12 +331,8 @@ function ok(payload) {
     JSON.stringify({ ok: true, result: payload })
   );
   output.setMimeType(ContentService.MimeType.JSON);
-
-
-
   return output;
 }
-
 
 function deletePhotoFromDrive(driveId) {
   try {
@@ -313,6 +367,7 @@ function colorRowByEtat(sheet, rowIndex, etat) {
 
   if (etat === "Dangereux (A abattre)") color = "#f28b82"; // rouge clair
   if (etat === "A surveiller")  color = "#fbbc04"; // orange clair
+  if (etat === "A élaguer prioritaire")  color = "#00FFFF"; // beuc lair
   if (etat === "A élaguer")  color = "#ccff90"; // vert clair
 
   const range = sheet.getRange(rowIndex, 1, 1, sheet.getLastColumn());
@@ -323,7 +378,11 @@ function colorRowByEtat(sheet, rowIndex, etat) {
     range.setBackground(null); // reset
   }
 }
-
-
-
-
+function jsonResponse(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON)
+    .setHeader("Access-Control-Allow-Origin", "*")
+    .setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+    .setHeader("Access-Control-Allow-Headers", "Content-Type");
+}
