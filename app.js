@@ -197,11 +197,15 @@ function createTreeIcon(color = "#4CAF50", etat = "") {
     badge = `<circle cx="46" cy="10" r="8" fill="#fb8c00" stroke="#000000ff" stroke-width="2"/>`;
   }
 
-  if (etat === "A élaguer prioritaire") {
+    if (etat === "A élaguer (URGENT)") {
+    badge = `<circle cx="46" cy="10" r="8" fill="#FFFF00" stroke="#000000ff" stroke-width="2"/>`;
+  }
+
+  if (etat === "A élaguer (Moyen)") {
     badge = `<circle cx="46" cy="10" r="8" fill="#00FFFF" stroke="#000000ff" stroke-width="2"/>`;
   }
 
-  if (etat === "A élaguer") {
+  if (etat === "A élaguer (Faible)") {
     badge = `<circle cx="46" cy="10" r="8" fill="#43a047" stroke="#000000ff" stroke-width="2"/>`;
   }
 
@@ -1498,8 +1502,9 @@ function getColorFromEtat(etat) {
   switch (etat) {
     case "Dangereux (A abattre)": return "#e53935"; // rouge
     case "A surveiller":  return "#fb8c00"; // orange
-    case "A élaguer prioritaire":  return "#00FFFF"; // beuc lair
-    case "A élaguer":  return "#43a047"; // vert
+    case "A élaguer (URGENT)":  return "#FFFF00"; // jaune
+    case "A élaguer (Moyen)":  return "#00FFFF"; // beuc lair
+    case "A élaguer (Faible)":  return "#43a047"; // vert
     default: return null;
   }
 }
