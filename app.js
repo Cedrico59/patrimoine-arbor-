@@ -499,43 +499,47 @@ del.className = "danger";
 del.textContent = "Retirer";
 
 del.onclick = async () => {
-  const photo = photos[idx];
 
-  // 🕓 PHOTO TEMPORAIRE (pas encore enregistrée)
- // 📸 PHOTO TEMPORAIRE (jamais envoyée à Sheets)
-if (photo.dataUrl && photo.dataUrl.startsWith("data:") && !photo.driveId) {
-  pendingPhotos = pendingPhotos.filter(p => p.id !== photo.id);
+  // 📸 PHOTO TEMPORAIRE (jamais envoyée à Drive)
+  if (p.dataUrl && p.dataUrl.startsWith("data:") && !p.driveId) {
 
-  updatePhotoStatus();
+    // supprimer de pendingPhotos
+    pendingPhotos = pendingPhotos.filter(x => x.id !== p.id);
 
-  const t = selectedId ? getTreeById(selectedId) : null;
-  const allPhotos = [
-    ...(t?.photos || []),
-    ...pendingPhotos
-  ];
+    // supprimer aussi d'un arbre existant si affiché
+    const t = selectedId ? getTreeById(selectedId) : null;
+    if (t && Array.isArray(t.photos)) {
+      t.photos = t.photos.filter(x => x.id !== p.id);
+    }
 
-  renderGallery(allPhotos);
-  renderPhotoCarousel(allPhotos);
-  return;
-}
+    updatePhotoStatus();
 
+    const allPhotos = [
+      ...(t?.photos || []),
+      ...pendingPhotos
+    ];
 
-  // 📦 PHOTO DÉJÀ ENREGISTRÉE (Drive)
-  if (!selectedId) return;
-  if (!confirm("Supprimer cette photo ?")) return;
+    renderGallery(allPhotos);
+    renderPhotoCarousel(allPhotos);
+    return;
+  }
 
-  const t = getTreeById(selectedId);
-  if (!t) return;
+  // ☁️ PHOTO ENREGISTRÉE (Drive)
+  if (p.driveId) {
+    if (!selectedId) return;
+    if (!confirm("Supprimer cette photo ?")) return;
 
-  await postToGAS({
-    action: "deletePhoto",
-    treeId: t.id,
-    photoDriveId: photo.driveId
-  });
+    await postToGAS({
+      action: "deletePhoto",
+      treeId: selectedId,
+      photoDriveId: p.driveId
+    });
 
-  await loadTreesFromSheets();
-  persistAndRefresh(t.id);
+    await loadTreesFromSheets();
+    persistAndRefresh(selectedId);
+  }
 };
+
 
 
 
