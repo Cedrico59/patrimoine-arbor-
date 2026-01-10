@@ -498,18 +498,19 @@ if (!p.driveId && p.url) {
 del.className = "danger";
 del.textContent = "Retirer";
 
-del.onclick = async () => {
+del.onclick = async (e) => {
+  e.stopPropagation();
+  e.preventDefault();
 
-  // 📸 PHOTO TEMPORAIRE (jamais envoyée à Drive)
-  if (p.dataUrl && p.dataUrl.startsWith("data:") && !p.driveId) {
+  const photo = p;
 
-    // supprimer de pendingPhotos
-    pendingPhotos = pendingPhotos.filter(x => x.id !== p.id);
+  // 📸 PHOTO TEMPORAIRE (appareil OU galerie)
+  if (photo.dataUrl && !photo.driveId) {
+    pendingPhotos = pendingPhotos.filter(x => x.id !== photo.id);
 
-    // supprimer aussi d'un arbre existant si affiché
     const t = selectedId ? getTreeById(selectedId) : null;
     if (t && Array.isArray(t.photos)) {
-      t.photos = t.photos.filter(x => x.id !== p.id);
+      t.photos = t.photos.filter(x => x.id !== photo.id);
     }
 
     updatePhotoStatus();
@@ -524,21 +525,21 @@ del.onclick = async () => {
     return;
   }
 
-  // ☁️ PHOTO ENREGISTRÉE (Drive)
-  if (p.driveId) {
-    if (!selectedId) return;
+  // ☁️ PHOTO DRIVE
+  if (photo.driveId) {
     if (!confirm("Supprimer cette photo ?")) return;
 
     await postToGAS({
       action: "deletePhoto",
       treeId: selectedId,
-      photoDriveId: p.driveId
+      photoDriveId: photo.driveId
     });
 
     await loadTreesFromSheets();
     persistAndRefresh(selectedId);
   }
 };
+
 
 
 
