@@ -114,6 +114,15 @@ async function postToGAS(payload) {
     return Math.random().toString(16).slice(2) + Date.now().toString(16);
   }
 
+
+  function safeUUID() {
+  if (window.crypto && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  // fallback compatible partout
+  return Math.random().toString(16).slice(2) + Date.now().toString(16);
+}
+
   function fmtCoord(x) {
     if (typeof x !== "number") return "";
     return x.toFixed(6);
@@ -466,7 +475,7 @@ if (m && m[1]) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w1200`;
 
   // ✅ GARANTIR UN ID UNIQUE POUR CHAQUE PHOTO
   if (!p.id) {
-    p.id = crypto.randomUUID();
+    p.id = safeUUID();
   }
 
   const wrap = document.createElement("div");
@@ -499,19 +508,17 @@ del.className = "danger";
 del.textContent = "Retirer";
 
 del.onclick = async (e) => {
-  e.stopPropagation();
   e.preventDefault();
+  e.stopPropagation();
 
   const photo = p;
 
-  // 📸 PHOTO TEMPORAIRE (appareil OU galerie)
-  if (photo.dataUrl && !photo.driveId) {
+  // 📸 temporaire (base64, pas encore sur Drive)
+  if (photo.dataUrl && photo.dataUrl.startsWith("data:") && !photo.driveId) {
     pendingPhotos = pendingPhotos.filter(x => x.id !== photo.id);
 
     const t = selectedId ? getTreeById(selectedId) : null;
-    if (t && Array.isArray(t.photos)) {
-      t.photos = t.photos.filter(x => x.id !== photo.id);
-    }
+    if (t?.photos) t.photos = t.photos.filter(x => x.id !== photo.id);
 
     updatePhotoStatus();
 
@@ -525,7 +532,7 @@ del.onclick = async (e) => {
     return;
   }
 
-  // ☁️ PHOTO DRIVE
+  // ☁️ sur Drive
   if (photo.driveId) {
     if (!confirm("Supprimer cette photo ?")) return;
 
@@ -539,6 +546,7 @@ del.onclick = async (e) => {
     persistAndRefresh(selectedId);
   }
 };
+
 
 
 
@@ -610,7 +618,7 @@ async function readFilesAsDataUrls(files) {
     const stampedDataUrl = await stampPhotoWithMeta(f, lat, lng);
 
     out.push({
-      id: crypto.randomUUID(), // ✅ CRITIQUE
+      id: safeUUID(), // ✅ CRITIQUE
       name: f.name,
       type: f.type,
       size: f.size,
