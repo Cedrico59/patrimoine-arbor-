@@ -462,9 +462,16 @@ if (m && m[1]) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w1200`;
     g.innerHTML = "";
     if (!photos || photos.length === 0) return;
 
-    photos.forEach((p, idx) => {
-      const wrap = document.createElement("div");
-      wrap.className = "photo";
+   photos.forEach((p, idx) => {
+
+  // ✅ GARANTIR UN ID UNIQUE POUR CHAQUE PHOTO
+  if (!p.id) {
+    p.id = crypto.randomUUID();
+  }
+
+  const wrap = document.createElement("div");
+  wrap.className = "photo";
+;
 
       const img = document.createElement("img");
      img.src = getPhotoSrc(p);
@@ -495,21 +502,23 @@ del.onclick = async () => {
   const photo = photos[idx];
 
   // 🕓 PHOTO TEMPORAIRE (pas encore enregistrée)
-  if (!photo.driveId) {
-    pendingPhotos = pendingPhotos.filter(p => p.id !== photo.id);
+ // 📸 PHOTO TEMPORAIRE (jamais envoyée à Sheets)
+if (photo.dataUrl && photo.dataUrl.startsWith("data:") && !photo.driveId) {
+  pendingPhotos = pendingPhotos.filter(p => p.id !== photo.id);
 
-    updatePhotoStatus();
+  updatePhotoStatus();
 
-    const t = selectedId ? getTreeById(selectedId) : null;
-    const allPhotos = [
-      ...(t?.photos || []),
-      ...pendingPhotos
-    ];
+  const t = selectedId ? getTreeById(selectedId) : null;
+  const allPhotos = [
+    ...(t?.photos || []),
+    ...pendingPhotos
+  ];
 
-    renderGallery(allPhotos);
-    renderPhotoCarousel(allPhotos);
-    return;
-  }
+  renderGallery(allPhotos);
+  renderPhotoCarousel(allPhotos);
+  return;
+}
+
 
   // 📦 PHOTO DÉJÀ ENREGISTRÉE (Drive)
   if (!selectedId) return;
@@ -1248,7 +1257,8 @@ if (undoBtn) {
     setSelected(t.id);
 
     // 🔗 restauration Google Sheets
-    await syncToSheets(t);
+    await loadTreesFromSheets();
+
 
     // ❌ cacher le bouton
     undoBtn.style.display = "none";
