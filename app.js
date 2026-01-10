@@ -114,15 +114,6 @@ async function postToGAS(payload) {
     return Math.random().toString(16).slice(2) + Date.now().toString(16);
   }
 
-
-  function safeUUID() {
-  if (window.crypto && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  // fallback compatible partout
-  return Math.random().toString(16).slice(2) + Date.now().toString(16);
-}
-
   function fmtCoord(x) {
     if (typeof x !== "number") return "";
     return x.toFixed(6);
@@ -471,16 +462,9 @@ if (m && m[1]) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w1200`;
     g.innerHTML = "";
     if (!photos || photos.length === 0) return;
 
-   photos.forEach((p, idx) => {
-
-  // ✅ GARANTIR UN ID UNIQUE POUR CHAQUE PHOTO
-  if (!p.id) {
-    p.id = safeUUID();
-  }
-
-  const wrap = document.createElement("div");
-  wrap.className = "photo";
-;
+    photos.forEach((p, idx) => {
+      const wrap = document.createElement("div");
+      wrap.className = "photo";
 
       const img = document.createElement("img");
      img.src = getPhotoSrc(p);
@@ -507,21 +491,16 @@ if (!p.driveId && p.url) {
 del.className = "danger";
 del.textContent = "Retirer";
 
-del.onclick = async (e) => {
-  e.preventDefault();
-  e.stopPropagation();
+del.onclick = async () => {
+  const photo = photos[idx];
 
-  const photo = p;
-
-  // 📸 temporaire (base64, pas encore sur Drive)
-  if (photo.dataUrl && photo.dataUrl.startsWith("data:") && !photo.driveId) {
-    pendingPhotos = pendingPhotos.filter(x => x.id !== photo.id);
-
-    const t = selectedId ? getTreeById(selectedId) : null;
-    if (t?.photos) t.photos = t.photos.filter(x => x.id !== photo.id);
+  // 🕓 PHOTO TEMPORAIRE (pas encore enregistrée)
+  if (!photo.driveId) {
+    pendingPhotos = pendingPhotos.filter(p => p.id !== photo.id);
 
     updatePhotoStatus();
 
+    const t = selectedId ? getTreeById(selectedId) : null;
     const allPhotos = [
       ...(t?.photos || []),
       ...pendingPhotos
@@ -532,23 +511,22 @@ del.onclick = async (e) => {
     return;
   }
 
-  // ☁️ sur Drive
-  if (photo.driveId) {
-    if (!confirm("Supprimer cette photo ?")) return;
+  // 📦 PHOTO DÉJÀ ENREGISTRÉE (Drive)
+  if (!selectedId) return;
+  if (!confirm("Supprimer cette photo ?")) return;
 
-    await postToGAS({
-      action: "deletePhoto",
-      treeId: selectedId,
-      photoDriveId: photo.driveId
-    });
+  const t = getTreeById(selectedId);
+  if (!t) return;
 
-    await loadTreesFromSheets();
-    persistAndRefresh(selectedId);
-  }
+  await postToGAS({
+    action: "deletePhoto",
+    treeId: t.id,
+    photoDriveId: photo.driveId
+  });
+
+  await loadTreesFromSheets();
+  persistAndRefresh(t.id);
 };
-
-
-
 
 
 
@@ -618,7 +596,7 @@ async function readFilesAsDataUrls(files) {
     const stampedDataUrl = await stampPhotoWithMeta(f, lat, lng);
 
     out.push({
-      id: safeUUID(), // ✅ CRITIQUE
+      id: crypto.randomUUID(), // ✅ CRITIQUE
       name: f.name,
       type: f.type,
       size: f.size,
@@ -1270,8 +1248,7 @@ if (undoBtn) {
     setSelected(t.id);
 
     // 🔗 restauration Google Sheets
-    await loadTreesFromSheets();
-
+    await syncToSheets(t);
 
     // ❌ cacher le bouton
     undoBtn.style.display = "none";
