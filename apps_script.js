@@ -1,0 +1,573 @@
+const SPREADSHEET_ID = "1EJsPjWfLKoxfOijnaixeo_ZcUtHrDka16_by9gjq_ns";
+function myFunction() {}
+const SHEET_TRAVAUX = "tableau_Elagages/Abattages";
+function TEST_DRIVE_LINKED() {
+  DriveApp.createFile("test_linked_drive.txt", "OK");
+}
+
+/* =========================
+   🔐 AUTH (AJOUT)
+========================= */
+const APP_PASSWORD = "marcq2026"; // 🔥 mets ton mot de passe ici
+const TOKEN_STORE = PropertiesService.getScriptProperties();
+const TOKEN_TTL_MS = 1000 * 60 * 60 * 12; // 12h
+
+function createToken_() {
+  const token = Utilities.getUuid();
+  TOKEN_STORE.setProperty(token, String(Date.now()));
+  return token;
+}
+
+function isValidToken_(token) {
+  if (!token) return false;
+  const ts = TOKEN_STORE.getProperty(token);
+  if (!ts) return false;
+
+  const age = Date.now() - Number(ts);
+  if (!Number.isFinite(age) || age > TOKEN_TTL_MS) {
+    TOKEN_STORE.deleteProperty(token);
+    return false;
+  }
+  return true;
+}
+
+function authFail_() {
+  return jsonResponse({ ok: false, error: "unauthorized" });
+}
+
+
+/* =========================
+   GET – LECTURE DES ARBRES
+   (MODIF: ajout auth + param e)
+========================= */
+function doGet(e) {
+  // 🔐 AUTH
+  const token = e?.parameter?.token;
+  if (!isValidToken_(token)) return authFail_();
+
+  const sheet = SpreadsheetApp
+    .openById(SPREADSHEET_ID)
+    .getSheetByName("Patrimoine_arboré");
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    return ContentService
+      .createTextOutput("[]")
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  const values = sheet
+    .getRange(2, 1, lastRow - 1, sheet.getLastColumn())
+    .getValues();
+
+  const trees = values
+    .map(row => {
+      const lat = Number(row[2]);
+      const lng = Number(row[3]);
+
+      return {
+        createdAt: row[0]?.getTime?.() || null,
+        id: row[1],
+        lat,
+        lng,
+        species: row[4],
+        height: row[5] !== "" ? Number(row[5]) : null,
+        dbh: row[6] !== "" ? Number(row[6]) : null,
+        secteur: row[7],
+        address: row[8],
+        tags: row[9] ? String(row[9]).split(",") : [],
+        comment: row[10],
+        etat: row[12] || "",
+
+        photos: (() => {
+          if (!row[11]) return [];
+          try { return JSON.parse(row[11]); }
+          catch (e) { return []; }
+        })(),
+
+        // ✅ tu lisais déjà row[13], donc on le garde
+        updatedAt: row[13] ? Number(row[13]) : null
+      };
+    })
+    .filter(t => t.id && Number.isFinite(t.lat) && Number.isFinite(t.lng));
+
+  return ContentService
+    .createTextOutput(JSON.stringify(trees))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+// ===== LECTURE DES TRAVAUX =====
+function doGet(e) {
+  const token = e?.parameter?.token;
+  if (!isValidToken_(token)) return authFail_();
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName("Patrimoine_arboré");
+  const sheetTravaux = ss.getSheetByName(SHEET_TRAVAUX);
+
+  /* ===== LECTURE TRAVAUX ===== */
+  const travauxMap = {};
+  if (sheetTravaux) {
+    const lastT = sheetTravaux.getLastRow();
+    if (lastT > 1) {
+      const valuesT = sheetTravaux
+        .getRange(2, 1, lastT - 1, sheetTravaux.getLastColumn())
+        .getValues();
+
+      valuesT.forEach(r => {
+        const treeId = String(r[0]).trim();
+        if (!treeId) return;
+
+        travauxMap[treeId] = {
+  dateDemande: formatDateForInput(r[2]),
+  natureTravaux: r[3] || "",
+  dateDemandeDevis: formatDateForInput(r[6]),
+  devisNumero: r[7] || "",
+  montantDevis: r[8] || "",
+  dateExecution: formatDateForInput(r[9]),
+  remarquesTravaux: r[10] || "",
+  numeroBDC: r[11] || "",
+  numeroFacture: r[12] || ""
+};
+
+      });
+    }
+  }
+
+  /* ===== LECTURE ARBRES ===== */
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    return ContentService.createTextOutput("[]")
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  const values = sheet
+    .getRange(2, 1, lastRow - 1, sheet.getLastColumn())
+    .getValues();
+
+  const trees = values.map(row => {
+    const lat = Number(row[2]);
+    const lng = Number(row[3]);
+    const id = row[1];
+    const travaux = travauxMap[id] || {};
+
+    return {
+      createdAt: row[0]?.getTime?.() || null,
+      id,
+      lat,
+      lng,
+      species: row[4],
+      height: row[5] !== "" ? Number(row[5]) : null,
+      dbh: row[6] !== "" ? Number(row[6]) : null,
+      secteur: row[7],
+      address: row[8],
+      tags: row[9] ? String(row[9]).split(",") : [],
+      comment: row[10],
+      photos: (() => {
+        if (!row[11]) return [];
+        try { return JSON.parse(row[11]); }
+        catch { return []; }
+      })(),
+      etat: row[12] || "",
+      updatedAt: row[13] ? Number(row[13]) : null,
+
+      // ✅ TRAVAUX RENVOYÉS À L’APP
+      dateDemande: travaux.dateDemande || "",
+      natureTravaux: travaux.natureTravaux || "",
+      dateDemandeDevis: travaux.dateDemandeDevis || "",
+      devisNumero: travaux.devisNumero || "",
+      montantDevis: travaux.montantDevis || "",
+      dateExecution: travaux.dateExecution || "",
+      remarquesTravaux: travaux.remarquesTravaux || "",
+      numeroBDC: travaux.numeroBDC || "",
+      numeroFacture: travaux.numeroFacture || ""
+    };
+  }).filter(t => t.id && Number.isFinite(t.lat) && Number.isFinite(t.lng));
+
+  return ContentService
+    .createTextOutput(JSON.stringify(trees))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+
+/* =========================
+   DRIVE
+========================= */
+const DRIVE_FOLDER_ID = "1EIZe632G9eADrxzIlpGALlSRHyUG1QLu";
+
+// 📁 1 dossier par arbre
+function getOrCreateTreeFolder(treeId) {
+  const root = DriveApp.getFolderById(DRIVE_FOLDER_ID);
+  const folders = root.getFoldersByName(treeId);
+  return folders.hasNext() ? folders.next() : root.createFolder(treeId);
+}
+
+// 📸 upload photo base64 → Drive
+function uploadPhoto(base64, filename, treeId) {
+  if (!base64 || !base64.startsWith("data:")) return null;
+
+  const folder = getOrCreateTreeFolder(treeId);
+  const match = base64.match(/^data:(.*);base64,/);
+  if (!match) return null;
+
+  const contentType = match[1];
+  const bytes = Utilities.base64Decode(base64.split(",")[1]);
+  const blob = Utilities.newBlob(bytes, contentType, filename);
+
+  const file = folder.createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+  return {
+    driveId: file.getId(), // ⭐ CRITIQUE
+    url: file.getUrl(),
+    name: filename,
+    addedAt: Date.now()
+  };
+}
+
+/* =========================
+   POST – LOGIN / CREATE / UPDATE / DELETE
+   (MODIF: ajout login + auth)
+========================= */
+function doPost(e) {
+  try {
+    // 🔐 LOGIN (action=login & password=...)
+    const actionParam = e?.parameter?.action;
+    if (actionParam === "login") {
+      const pwd = e?.parameter?.password || "";
+      if (pwd !== APP_PASSWORD) return authFail_();
+
+      const token = createToken_();
+      return ContentService
+        .createTextOutput(JSON.stringify({ ok: true, token }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 🔐 AUTH obligatoire pour tout le reste
+    const token = e?.parameter?.token;
+    if (!isValidToken_(token)) return authFail_();
+
+    let data = {};
+
+    // ✅ Accepte :
+    // - payload JSON (payload=...)
+    // - paramètres directs (action=...&id=...)
+    // - JSON brut dans le body
+    if (e && e.parameter && Object.keys(e.parameter).length) {
+      if (e.parameter.payload) {
+        data = JSON.parse(e.parameter.payload);
+      } else {
+        // paramètres directs
+        data = { ...e.parameter };
+      }
+    } else if (e && e.postData && e.postData.contents) {
+      data = JSON.parse(e.postData.contents);
+    } else {
+      throw new Error("Aucun payload reçu");
+    }
+
+    // ✅ si on reçoit { payload: {...} }
+    if (data && data.payload) data = data.payload;
+
+    // (optionnel) on ne garde pas token/password dans data pour éviter effets de bord
+    if (data && typeof data === "object") {
+      delete data.token;
+      delete data.password;
+    }
+
+    const sheet = SpreadsheetApp
+      .openById(SPREADSHEET_ID)
+      .getSheetByName("Patrimoine_arboré");
+
+    const lastRow = sheet.getLastRow();
+
+    /* ===== SUPPRESSION PHOTO ===== */
+    if (data.action === "deletePhoto" && data.photoDriveId && data.treeId) {
+      const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+
+      for (let i = 0; i < rows.length; i++) {
+        const sheetTreeId = String(rows[i][1]).trim();
+        if (sheetTreeId === String(data.treeId).trim()) {
+
+          let photos = [];
+          try {
+            photos = rows[i][11] ? JSON.parse(rows[i][11]) : [];
+          } catch (err) {
+            photos = [];
+          }
+
+          // Drive
+          deletePhotoFromDrive(String(data.photoDriveId).trim());
+
+          // Sheets
+          const newPhotos = photos.filter(p =>
+            String(p.driveId || "").trim() !== String(data.photoDriveId).trim()
+          );
+
+          sheet.getRange(i + 2, 12).setValue(JSON.stringify(newPhotos));
+          SpreadsheetApp.flush();
+
+          return ok({ status: "PHOTO_DELETED", remaining: newPhotos.length });
+        }
+      }
+
+      return ok({ status: "NOT_FOUND" });
+    }
+
+    /* ===== SUPPRESSION ARBRE ===== */
+    if (data.action === "delete" && data.id) {
+      if (lastRow < 2) return ok({ status: "NOT_FOUND" });
+
+      const rows = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues();
+
+      for (let i = 0; i < rows.length; i++) {
+        if (String(rows[i][1]).trim() === String(data.id).trim()) {
+          deleteTreeFolder(String(data.id).trim());
+          sheet.deleteRow(i + 2);
+          SpreadsheetApp.flush();
+          return ok({ status: "DELETED" });
+        }
+      }
+
+      return ok({ status: "NOT_FOUND" });
+    }
+
+    // ✅ create/update -> id obligatoire
+    if (!data.id) throw new Error("id manquant (create/update)");
+
+    // ✅ conversions si on est passé par e.parameter (tout est string)
+    if (typeof data.tags === "string") {
+      try { data.tags = JSON.parse(data.tags); }
+      catch { data.tags = String(data.tags).split(",").map(s => s.trim()).filter(Boolean); }
+    }
+    if (typeof data.photos === "string") {
+      try { data.photos = JSON.parse(data.photos); }
+      catch { data.photos = []; }
+    }
+
+    /* ===== PHOTOS EXISTANTES ===== */
+    let existingPhotos = [];
+    if (lastRow > 1) {
+      const rows = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues();
+      for (let i = 0; i < rows.length; i++) {
+        if (String(rows[i][1]).trim() === String(data.id).trim() && rows[i][11]) {
+          existingPhotos = JSON.parse(rows[i][11]);
+          break;
+        }
+      }
+    }
+
+    /* ===== NOUVELLES PHOTOS ===== */
+    let uploadedPhotos = [];
+    if (Array.isArray(data.photos)) {
+      uploadedPhotos = data.photos
+        .map(p => uploadPhoto(
+          p.dataUrl,
+          `${Date.now()}_${p.name || "photo.jpg"}`,
+          data.id
+        ))
+        .filter(Boolean);
+    }
+
+    const allPhotos = existingPhotos.concat(uploadedPhotos);
+
+    /* ===== DONNÉES =====
+       ✅ Ajout updatedAt (col 14) pour correspondre à ton doGet row[13]
+    */
+    const rowData = [
+      new Date(),
+      data.id || "",
+      data.lat || "",
+      data.lng || "",
+      data.species || "",
+      data.height || "",
+      data.dbh || "",
+      data.secteur || "",
+      data.address || "",
+      (data.tags || []).join(","),
+      data.comment || "",
+      JSON.stringify(allPhotos),
+      data.etat || "",
+      data.updatedAt || Date.now()
+    ];
+
+    let isUpdate = false;
+
+/* ===== UPDATE ===== */
+if (lastRow > 1) {
+  const ids = sheet.getRange(2, 2, lastRow - 1, 1).getValues();
+  for (let i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]).trim() === String(data.id).trim()) {
+      sheet.getRange(i + 2, 1, 1, rowData.length)
+        .setValues([rowData]);
+
+      colorRowByEtat(sheet, i + 2, data.etat);
+      isUpdate = true;
+      break;
+    }
+  }
+}
+/* ===== TRAVAUX (Élagages / Abattages) ===== */
+const sheetTravaux = SpreadsheetApp
+  .openById(SPREADSHEET_ID)
+  .getSheetByName(SHEET_TRAVAUX);
+
+const travauxRow = [
+  data.id,
+  data.etat || "",
+  data.dateDemande || "",
+  data.natureTravaux || "",
+  data.address || "",
+  data.species || "",
+  data.dateDemandeDevis || "",
+  data.devisNumero || "",
+  data.montantDevis || "",
+  data.dateExecution || "",
+  data.remarquesTravaux || "",
+  data.numeroBDC || "",
+  data.numeroFacture || ""
+];
+
+const lastTravaux = sheetTravaux.getLastRow();
+let foundTravaux = false;
+
+if (lastTravaux > 1) {
+  const idsTravaux = sheetTravaux.getRange(2, 1, lastTravaux - 1, 1).getValues();
+  for (let i = 0; i < idsTravaux.length; i++) {
+    if (String(idsTravaux[i][0]).trim() === String(data.id).trim()) {
+      const rowIndex = i + 2;
+
+sheetTravaux
+  .getRange(rowIndex, 1, 1, travauxRow.length)
+  .setValues([travauxRow]);
+
+colorEtatTravaux(sheetTravaux, rowIndex, data.etat);
+foundTravaux = true;
+break;
+
+    }
+  }
+}
+
+if (!foundTravaux) {
+ sheetTravaux.appendRow(travauxRow);
+const newRow = sheetTravaux.getLastRow();
+colorEtatTravaux(sheetTravaux, newRow, data.etat);
+
+}
+
+
+    /* ===== CREATE ===== */
+    /* ===== CREATE ===== */
+if (!isUpdate) {
+  sheet.appendRow(rowData);
+  const newRow = sheet.getLastRow();
+  colorRowByEtat(sheet, newRow, data.etat);
+}
+    SpreadsheetApp.flush();
+    return ok({ status: "CREATED", photos: allPhotos });
+
+  } catch (err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: false, error: String(err) }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+/* =========================
+   UTIL
+========================= */
+function ok(payload) {
+  const output = ContentService.createTextOutput(
+    JSON.stringify({ ok: true, result: payload })
+  );
+  output.setMimeType(ContentService.MimeType.JSON);
+  return output;
+}
+
+function deletePhotoFromDrive(driveId) {
+  try {
+    if (!driveId) return false;
+    DriveApp.getFileById(driveId).setTrashed(true);
+    return true;
+  } catch (e) {
+    Logger.log("Erreur suppression photo Drive: " + e);
+    return false;
+  }
+}
+
+function deleteTreeFolder(treeId) {
+  const root = DriveApp.getFolderById(DRIVE_FOLDER_ID);
+  const folders = root.getFoldersByName(treeId);
+
+  while (folders.hasNext()) {
+    const folder = folders.next();
+    folder.setTrashed(true);
+  }
+}
+
+function assertSheetAlive() {
+  const file = DriveApp.getFileById(SPREADSHEET_ID);
+  if (file.isTrashed()) {
+    throw new Error("❌ Le Spreadsheet est dans la corbeille !");
+  }
+}
+
+function colorRowByEtat(sheet, rowIndex, etat) {
+  let color = null;
+
+  if (etat === "Dangereux (A abattre)") color = "#f28b82"; // rouge clair
+  if (etat === "A surveiller")  color = "#fbbc04"; // orange clair
+  if (etat === "A élaguer (URGENT)")  color = "#FFFF00"; // jaune
+  if (etat === "A élaguer (Moyen)")  color = "#00FFFF"; // beuc lair
+  if (etat === "A élaguer (Faible)")  color = "#ccff90"; // vert clair
+
+  const range = sheet.getRange(rowIndex, 1, 1, sheet.getLastColumn());
+
+  if (color) {
+    range.setBackground(color);
+  } else {
+    range.setBackground(null); // reset
+  }
+}
+function colorEtatTravaux(sheet, rowIndex, etat) {
+  let color = null;
+
+    if (etat === "Dangereux (A abattre)") color = "#f28b82"; // rouge clair
+  if (etat === "A surveiller")  color = "#fbbc04"; // orange clair
+  if (etat === "A élaguer (URGENT)")  color = "#FFFF00"; // jaune
+  if (etat === "A élaguer (Moyen)")  color = "#00FFFF"; // beuc lair
+  if (etat === "A élaguer (Faible)")  color = "#ccff90"; // vert clair
+
+  // 👉 UNIQUEMENT la colonne État (B)
+  const cell = sheet.getRange(rowIndex, 2);
+
+  if (color) {
+    cell.setBackground(color);
+    cell.setFontWeight("bold");
+  } else {
+    cell.setBackground(null);
+    cell.setFontWeight("normal");
+  }
+}
+
+
+function jsonResponse(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON)
+    .setHeader("Access-Control-Allow-Origin", "*")
+    .setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+    .setHeader("Access-Control-Allow-Headers", "Content-Type");
+}
+
+function formatDateForInput(d) {
+  if (!d) return "";
+  if (Object.prototype.toString.call(d) !== "[object Date]") return "";
+  if (isNaN(d.getTime())) return "";
+
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+
+  return `${yyyy}-${mm}-${dd}`;
+}
